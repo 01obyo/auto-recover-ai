@@ -1,5 +1,6 @@
 import os
 from fastapi import FastAPI, Form, Response
+from fastapi.responses import HTMLResponse, FileResponse
 from twilio.twiml.messaging_response import MessagingResponse
 from groq import Groq
 
@@ -19,10 +20,12 @@ HUMAN TEXTING RULES (CRITICAL):
 6. If they want an in-person estimate before paying, agree immediately and set a 10-minute slot.
 """
 
-@app.get("/")
-async def health_check():
-    """Health check endpoint to verify server is live"""
-    return {"status": "online", "message": "AutoRecover AI Engine is live and running!"}
+@app.get("/", response_class=HTMLResponse)
+async def serve_dashboard():
+    """Serves the Executive UI Dashboard at the root link"""
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return HTMLResponse("<h2>Dashboard file loading...</h2>")
 
 @app.post("/sms")
 async def handle_incoming_sms(From: str = Form(...), Body: str = Form(...)):
