@@ -32,10 +32,8 @@ async def handle_incoming_sms(From: str = Form(...), Body: str = Form(...)):
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         twiml = MessagingResponse()
-        twiml.message("Error: GROQ_API_KEY environment variable is not configured.")
+        twiml.message("Error: GROQ_API_KEY environment variable is not configured in Render.")
         return Response(content=str(twiml), media_type="application/xml")
-
-    client = Groq(api_key=api_key)
 
     if From not in conversation_history:
         conversation_history[From] = [
@@ -45,15 +43,18 @@ async def handle_incoming_sms(From: str = Form(...), Body: str = Form(...)):
     conversation_history[From].append({"role": "user", "content": Body})
     history_slice = [conversation_history[From][0]] + conversation_history[From][-8:]
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=history_slice,
-        temperature=0.65,
-        max_tokens=150
-    )
-
-    human_reply = response.choices[0].message.content.strip()
-    conversation_history[From].append({"role": "assistant", "content": human_reply})
+    try:
+        client = Groq(api_key=api_key.strip())
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=history_slice,
+            temperature=0.65,
+            max_tokens=150
+        )
+        human_reply = response.choices[0].message.content.strip()
+        conversation_history[From].append({"role": "assistant", "content": human_reply})
+    except Exception as e:
+        human_reply = f"Groq Key Error: {str(e)}"
 
     twiml = MessagingResponse()
     twiml.message(human_reply)
