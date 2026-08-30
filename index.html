@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoRecover AI — Executive Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#051F20] text-[#DAF1DE] min-h-screen font-sans p-4 md:p-8">
+
+  <!-- Header Section -->
+  <header class="max-w-6xl mx-auto flex justify-between items-center pb-6 border-b border-[#235347]">
+    <div>
+      <h1 class="text-2xl md:text-3xl font-bold text-[#DAF1DE]">AutoRecover AI</h1>
+      <p class="text-xs md:text-sm text-[#8EB69B]">Apex Mobile Auto Detailing — Active Recovery Engine</p>
+    </div>
+    <span class="inline-flex items-center gap-2 bg-[#163832] border border-[#235347] text-[#8EB69B] px-3 py-1 rounded-full text-xs font-semibold">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Engine Online
+    </span>
+  </header>
+
+  <main class="max-w-6xl mx-auto mt-8 space-y-8">
+    
+    <!-- Revenue & Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-[#0B2B26] border border-[#235347] p-6 rounded-xl shadow-lg">
+        <p class="text-xs uppercase font-bold tracking-wider text-[#8EB69B]">Revenue Secured</p>
+        <h2 class="text-3xl font-extrabold text-[#DAF1DE] mt-2">$1,850.00</h2>
+        <p class="text-xs text-emerald-400 mt-1">↑ +$350 today from 2 recovered leads</p>
+      </div>
+
+      <div class="bg-[#0B2B26] border border-[#235347] p-6 rounded-xl shadow-lg">
+        <p class="text-xs uppercase font-bold tracking-wider text-[#8EB69B]">Missed Calls Intercepted</p>
+        <h2 class="text-3xl font-extrabold text-[#DAF1DE] mt-2">14 Leads</h2>
+        <p class="text-xs text-[#8EB69B] mt-1">100% response rate within 5s</p>
+      </div>
+
+      <div class="bg-[#0B2B26] border border-[#235347] p-6 rounded-xl shadow-lg">
+        <p class="text-xs uppercase font-bold tracking-wider text-[#8EB69B]">Booked Jobs</p>
+        <h2 class="text-3xl font-extrabold text-[#DAF1DE] mt-2">9 Confirmed</h2>
+        <p class="text-xs text-emerald-400 mt-1">64% lead-to-booking conversion rate</p>
+      </div>
+    </div>
+
+    <!-- Layout: Unified Inbox & Live Test Sandbox -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      
+      <!-- Unified AI Conversations Feed -->
+      <div class="bg-[#0B2B26] border border-[#235347] p-6 rounded-xl space-y-4">
+        <h3 class="text-lg font-bold text-[#DAF1DE] flex justify-between items-center">
+          Unified AI Inbox
+          <span class="text-xs font-normal text-[#8EB69B]">Real-Time Feed</span>
+        </h3>
+        
+        <div class="space-y-3 max-h-[380px] overflow-y-auto pr-2">
+          <!-- Conversation Card 1 -->
+          <div class="bg-[#163832] p-4 rounded-lg border border-[#235347] space-y-2">
+            <div class="flex justify-between text-xs text-[#8EB69B]">
+              <span class="font-semibold text-[#DAF1DE]">+1 (555) 234-8901</span>
+              <span>10 mins ago</span>
+            </div>
+            <p class="text-xs text-slate-300"><strong>Customer:</strong> "Hey missed your call, how much for full interior detail on a sedan?"</p>
+            <p class="text-xs text-[#8EB69B]"><strong>Alex (AI):</strong> "Hey! I'm out on a detail right now. Full interior for a sedan is $180. Want me to get you booked for tomorrow?"</p>
+            <span class="inline-block bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 text-[10px] px-2 py-0.5 rounded font-bold">Secured: $180</span>
+          </div>
+
+          <!-- Conversation Card 2 -->
+          <div class="bg-[#163832] p-4 rounded-lg border border-[#235347] space-y-2">
+            <div class="flex justify-between text-xs text-[#8EB69B]">
+              <span class="font-semibold text-[#DAF1DE]">+1 (555) 876-5432</span>
+              <span>1 hour ago</span>
+            </div>
+            <p class="text-xs text-slate-300"><strong>Customer:</strong> "Do you guys do paint correction?"</p>
+            <p class="text-xs text-[#8EB69B]"><strong>Alex (AI):</strong> "Yep, sure do! Depends on the condition—usually 1 or 2 steps. What kind of vehicle do you have?"</p>
+            <span class="inline-block bg-emerald-900/60 text-emerald-300 border border-emerald-700/50 text-[10px] px-2 py-0.5 rounded font-bold">Secured: $350</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Interactive Demo Sandbox -->
+      <div class="bg-[#0B2B26] border border-[#235347] p-6 rounded-xl flex flex-col justify-between space-y-4">
+        <div>
+          <h3 class="text-lg font-bold text-[#DAF1DE]">Live Pitch Sandbox</h3>
+          <p class="text-xs text-[#8EB69B] mt-1">Test the AI receptionist responses live right here.</p>
+        </div>
+
+        <!-- Chat Container -->
+        <div id="chatBox" class="bg-[#163832] border border-[#235347] p-4 rounded-lg h-64 overflow-y-auto space-y-3 text-xs">
+          <div class="bg-[#235347] p-3 rounded-lg max-w-[80%] text-[#DAF1DE]">
+            <strong>Alex (AI):</strong> Hey! Sorry I missed your call, I'm out on a mobile job right now. How can I help you out?
+          </div>
+        </div>
+
+        <!-- Input Area -->
+        <form id="sandboxForm" class="flex gap-2">
+          <input type="text" id="userInput" placeholder="Type a message (e.g. How much for a SUV detail?)..." 
+                 class="flex-1 bg-[#163832] border border-[#235347] text-[#DAF1DE] text-xs p-3 rounded-lg focus:outline-none focus:border-[#8EB69B]">
+          <button type="submit" class="bg-[#235347] hover:bg-[#8EB69B] hover:text-[#051F20] text-[#DAF1DE] font-bold text-xs px-4 py-3 rounded-lg transition">
+            Send
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    const form = document.getElementById('sandboxForm');
+    const input = document.getElementById('userInput');
+    const chatBox = document.getElementById('chatBox');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      // Append User Message
+      chatBox.innerHTML += `<div class="bg-[#051F20] p-3 rounded-lg max-w-[80%] ml-auto text-right text-slate-200"><strong>You:</strong> ${text}</div>`;
+      input.value = '';
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      // Send to Backend API
+      try {
+        const formData = new FormData();
+        formData.append('From', '+19999999999');
+        formData.append('Body', text);
+
+        const res = await fetch('/sms', { method: 'POST', body: formData });
+        const xmlText = await res.text();
+        
+        // Extract text from TwiML XML response
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+        const reply = xmlDoc.getElementsByTagName("Message")[0]?.textContent || "Got it!";
+
+        // Append AI Reply
+        chatBox.innerHTML += `<div class="bg-[#235347] p-3 rounded-lg max-w-[80%] text-[#DAF1DE]"><strong>Alex (AI):</strong> ${reply}</div>`;
+      } catch (err) {
+        chatBox.innerHTML += `<div class="bg-red-900/50 p-2 rounded text-red-200">Error connecting to engine.</div>`;
+      }
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+  </script>
+</body>
+</html>
