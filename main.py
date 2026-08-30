@@ -9,54 +9,63 @@ app = FastAPI(title="AutoRecover AI Engine")
 conversation_history = {}
 
 HUMAN_SYSTEM_PROMPT = """
-You are Alex, the sole owner/receptionist at Apex Mobile Auto Detailing. A customer just tried calling your mobile line while you were on a job.
+You are Alex, the sole owner/receptionist at Apex Mobile Auto Detailing. A customer missed your call after reaching out.
+
+BUSINESS KNOWLEDGE BASE:
+- Full Interior & Exterior Sedan Detail: $180
+- Full Interior & Exterior SUV / Truck Detail: $220
+- Paint Correction & Polish: $350
+- Ceramic Coating Package: $600
+- Location: Mobile service (we come to the client's home or office).
 
 HUMAN TEXTING RULES (CRITICAL):
-1. Sound like a real person texting from a smartphone. Keep messages brief (1 to 3 short sentences max).
-2. NEVER sound like an assistant or bot. No "How may I assist you today?" or "Thank you for reaching out!".
-3. Use casual, natural phrasing ("Hey!", "Gotcha", "No problem", "I'm out on a detail right now").
-4. Always ask ONE question at a time so the back-and-forth feels natural.
-5. If they want a price or booking, ask for their vehicle type or preferred day.
-6. If they want an in-person estimate before paying, agree immediately and set a 10-minute slot.
+1. Sound like a real business owner texting from a smartphone. Keep replies under 3 sentences.
+2. NEVER sound like a generic bot or assistant. Avoid phrases like "How may I assist you?" or "Thank you for reaching out!".
+3. Use natural, conversational phrasing ("Hey!", "Gotcha", "I'm out on a detail right now").
+4. Always give the exact price from the knowledge base, then ask ONE question to lock in a booking slot or vehicle detail.
 """
 
-@app.get("/", response_class=HTMLResponse)
-async def serve_dashboard():
-    """Serves the Executive UI Dashboard at the root link"""
-    if os.path.exists("index.html"):
-        return FileResponse("index.html")
-    return HTMLResponse("<h2>Dashboard file loading...</h2>")
-
-@app.post("/sms")
-async def handle_incoming_sms(From: str = Form(...), Body: str = Form(...)):
-    api_key = os.environ.get("GROQ_API_KEY")
+def get_ai_reply(user_id: str, message: str) -> str:
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
     if not api_key:
-        twiml = MessagingResponse()
-        twiml.message("Error: GROQ_API_KEY environment variable is not configured in Render.")
-        return Response(content=str(twiml), media_type="application/xml")
+        return "Error: GROQ_API_KEY environment variable is missing on Render."
 
-    if From not in conversation_history:
-        conversation_history[From] = [
-            {"role": "system", "content": HUMAN_SYSTEM_PROMPT}
-        ]
+    if user_id not in conversation_history:
+        conversation_history[user_id] = [{"role": "system", "content": HUMAN_SYSTEM_PROMPT}]
 
-    conversation_history[From].append({"role": "user", "content": Body})
-    history_slice = [conversation_history[From][0]] + conversation_history[From][-8:]
+    conversation_history[user_id].append({"role": "user", "content": message})
+    history_slice = [conversation_history[user_id][0]] + conversation_history[user_id][-8:]
 
     try:
-        client = Groq(api_key=api_key.strip())
+        client = Groq(api_key=api_key)
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=history_slice,
             temperature=0.65,
             max_tokens=150
         )
-        human_reply = response.choices[0].message.content.strip()
-        conversation_history[From].append({"role": "assistant", "content": human_reply})
+        reply = response.choices[0].message.content.strip()
+        conversation_history[user_id].append({"role": "assistant", "content": reply})
+        return reply
     except Exception as e:
-        human_reply = f"Groq Key Error: {str(e)}"
+        return f"AI Error: {str(e)}"
 
+@app.get("/", response_class=HTMLResponse)
+async def serve_dashboard():
+    if os.path.exists("index.html"):
+        return FileResponse("index.html")
+    return HTMLResponse("<h2>Dashboard file loading...</h2>")
+
+@app.post("/api/chat")
+async def web_sandbox_chat(Body: str = Form(...)):
+    """Direct JSON endpoint for web dashboard sandbox"""
+    reply = get_ai_reply(user_id="web_demo_user", message=Body)
+    return {"reply": reply}
+
+@app.post("/sms")
+async def handle_incoming_sms(From: str = Form(...), Body: str = Form(...)):
+    """TwiML XML endpoint for live Twilio SMS webhook"""
+    reply = get_ai_reply(user_id=From, message=Body)
     twiml = MessagingResponse()
-    twiml.message(human_reply)
-
+    twiml.message(reply)
     return Response(content=str(twiml), media_type="application/xml")
