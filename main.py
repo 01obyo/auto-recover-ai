@@ -5,8 +5,6 @@ from groq import Groq
 
 app = FastAPI(title="AutoRecover AI Engine")
 
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
-
 conversation_history = {}
 
 HUMAN_SYSTEM_PROMPT = """
@@ -21,8 +19,21 @@ HUMAN TEXTING RULES (CRITICAL):
 6. If they want an in-person estimate before paying, agree immediately and set a 10-minute slot.
 """
 
+@app.get("/")
+async def health_check():
+    """Health check endpoint to verify server is live"""
+    return {"status": "online", "message": "AutoRecover AI Engine is live and running!"}
+
 @app.post("/sms")
 async def handle_incoming_sms(From: str = Form(...), Body: str = Form(...)):
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        twiml = MessagingResponse()
+        twiml.message("Error: GROQ_API_KEY environment variable is not configured.")
+        return Response(content=str(twiml), media_type="application/xml")
+
+    client = Groq(api_key=api_key)
+
     if From not in conversation_history:
         conversation_history[From] = [
             {"role": "system", "content": HUMAN_SYSTEM_PROMPT}
