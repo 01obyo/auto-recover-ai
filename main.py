@@ -69,3 +69,17 @@ async def handle_incoming_sms(From: str = Form(...), Body: str = Form(...)):
     twiml = MessagingResponse()
     twiml.message(reply)
     return Response(content=str(twiml), media_type="application/xml")
+
+@app.post("/webhook/telegram")
+async def telegram_webhook(request: Request):
+    data = await request.json()
+    
+    # Extract chat ID and text from Telegram's payload
+    if "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        user_text = data["message"].get("text", "")
+        
+        # Pass user_text to Groq and send response back to Telegram...
+        
+    return {"status": "ok"}
+    
