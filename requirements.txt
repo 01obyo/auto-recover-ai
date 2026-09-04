@@ -3,3 +3,5 @@ uvicorn
 twilio
 groq
 python-multipart
+httpx
+sentry-sdk
