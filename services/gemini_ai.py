@@ -21,7 +21,7 @@ def get_ai_reply(user_id: str, message: str) -> str:
     )
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash",
         contents=f"{HUMAN_SYSTEM_PROMPT}\n\nConversation:\n{transcript}",
     )
     reply = response.text.strip()
