@@ -1,9 +1,23 @@
 from fastapi import APIRouter, Request, Response
 from twilio.twiml.messaging_response import MessagingResponse
+from twilio.request_validator import RequestValidator
 
+from config import TWILIO_AUTH_TOKEN
 from services.gemini_ai import get_ai_reply
 
 router = APIRouter()
+request_validator = RequestValidator(TWILIO_AUTH_TOKEN) if TWILIO_AUTH_TOKEN else None
+
+
+async def _validate_twilio_request(request: Request, form: dict[str, str]) -> bool:
+    signature = request.headers.get("X-Twilio-Signature", "")
+    if request_validator is None or not signature:
+        return False
+
+    try:
+        return request_validator.validate(str(request.url), form, signature)
+    except Exception:
+        return False
 
 
 def _message_for_webhook(phone_number: str, body: str, call_status: str) -> str:
@@ -22,6 +36,15 @@ def _message_for_webhook(phone_number: str, body: str, call_status: str) -> str:
 async def handle_twilio_webhook(request: Request):
     """Handle incoming SMS messages and missed-call notifications from Twilio."""
     form = await request.form()
+    form_values = {key: str(value) for key, value in form.items()}
+
+    if not await _validate_twilio_request(request, form_values):
+        return Response(
+            content="Invalid Twilio signature",
+            status_code=403,
+            media_type="text/plain",
+        )
+
     phone_number = str(form.get("From") or form.get("from") or "").strip()
     body = str(form.get("Body") or form.get("body") or "")
     call_status = str(form.get("CallStatus") or form.get("call_status") or "")
