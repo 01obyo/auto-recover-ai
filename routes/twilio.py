@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Form, Response
 from twilio.twiml.messaging_response import MessagingResponse
 
-from services.groq_ai import get_ai_reply
+from services.gemini_ai import get_ai_reply
 
 router = APIRouter()
 

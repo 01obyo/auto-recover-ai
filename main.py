@@ -26,7 +26,7 @@ async def serve_dashboard():
 @app.post("/api/chat")
 async def web_sandbox_chat(Body: str = Form(...)):
     """Direct JSON endpoint for web dashboard sandbox"""
-    from services.groq_ai import get_ai_reply
+    from services.gemini_ai import get_ai_reply
 
     reply = get_ai_reply(user_id="web_demo_user", message=Body)
     return {"reply": reply}
