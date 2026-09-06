@@ -1,23 +1,18 @@
-from google import genai
-from google.genai import types
+import os
 
-from config import GEMINI_API_KEY, HUMAN_SYSTEM_PROMPT
+from google import genai
+from google.genai.types import HttpOptions
+
+from config import HUMAN_SYSTEM_PROMPT
 
 conversation_history: dict[str, list[dict[str, str]]] = {}
-client = (
-    genai.Client(
-        api_key=GEMINI_API_KEY,
-        http_options=types.HttpOptions(api_version="v1"),
-    )
-    if GEMINI_API_KEY
-    else None
+client = genai.Client(
+    api_key=os.environ.get("GEMINI_API_KEY"),
+    http_options=HttpOptions(api_version="v1"),
 )
 
 
 def get_ai_reply(user_id: str, message: str) -> str:
-    if client is None:
-        raise RuntimeError("GEMINI_API_KEY environment variable is not configured")
-
     history = conversation_history.setdefault(user_id, [])
     history.append({"role": "user", "content": message})
     history_slice = history[-8:]
@@ -26,7 +21,7 @@ def get_ai_reply(user_id: str, message: str) -> str:
     )
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=f"{HUMAN_SYSTEM_PROMPT}\n\nConversation:\n{transcript}",
     )
     reply = response.text.strip()
