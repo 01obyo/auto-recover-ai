@@ -1,9 +1,17 @@
 from google import genai
+from google.genai import types
 
 from config import GEMINI_API_KEY, HUMAN_SYSTEM_PROMPT
 
 conversation_history: dict[str, list[dict[str, str]]] = {}
-client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+client = (
+    genai.Client(
+        api_key=GEMINI_API_KEY,
+        http_options=types.HttpOptions(api_version="v1"),
+    )
+    if GEMINI_API_KEY
+    else None
+)
 
 
 def get_ai_reply(user_id: str, message: str) -> str:
@@ -18,7 +26,7 @@ def get_ai_reply(user_id: str, message: str) -> str:
     )
 
     response = client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash",
         contents=f"{HUMAN_SYSTEM_PROMPT}\n\nConversation:\n{transcript}",
     )
     reply = response.text.strip()
