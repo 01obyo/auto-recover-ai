@@ -43,7 +43,7 @@ async def test_ui():
         <body class="bg-[#051F20] text-white flex items-center justify-center h-screen">
             <div class="bg-[#0B2B26] p-8 rounded-xl shadow-lg w-96 border border-[#235347]">
                 <h1 class="text-xl font-bold mb-4 text-[#8EB69B]">AutoRecover AI Tester</h1>
-                <form action="/webhook/twilio" method="POST" class="space-y-4">
+                <form action="/twilio/webhook" method="POST" class="space-y-4">
                     <div>
                         <label class="block text-sm mb-1">Caller Number</label>
                         <input type="text" name="From" value="+1234567890" class="w-full p-2 rounded bg-[#163832] border border-[#235347] text-white">
