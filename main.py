@@ -30,3 +30,31 @@ async def web_sandbox_chat(Body: str = Form(...)):
 
     reply = get_ai_reply(user_id="web_demo_user", message=Body)
     return {"reply": reply}
+from fastapi.responses import HTMLResponse
+
+@app.get("/test-ui", response_class=HTMLResponse)
+async def test_ui():
+    return """
+    <html>
+        <head>
+            <title>AutoRecover AI Test</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body class="bg-[#051F20] text-white flex items-center justify-center h-screen">
+            <div class="bg-[#0B2B26] p-8 rounded-xl shadow-lg w-96 border border-[#235347]">
+                <h1 class="text-xl font-bold mb-4 text-[#8EB69B]">AutoRecover AI Tester</h1>
+                <form action="/webhook/twilio" method="POST" class="space-y-4">
+                    <div>
+                        <label class="block text-sm mb-1">Caller Number</label>
+                        <input type="text" name="From" value="+1234567890" class="w-full p-2 rounded bg-[#163832] border border-[#235347] text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1">Message / Missed Call Note</label>
+                        <textarea name="Body" class="w-full p-2 rounded bg-[#163832] border border-[#235347] text-white">Hello, I missed your call.</textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-[#235347] hover:bg-[#8EB69B] hover:text-[#051F20] py-2 rounded font-bold transition">Simulate Webhook</button>
+                </form>
+            </div>
+        </body>
+    </html>
+    """
