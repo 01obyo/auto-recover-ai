@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 twilio
-google-genai
+google-generativeai
 python-multipart
 httpx
 sentry-sdk
