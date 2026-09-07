@@ -1,71 +1,70 @@
-from fastapi import APIRouter, Request, Response
-from starlette.concurrency import run_in_threadpool
+from fastapi import APIRouter, Form, Response
 from twilio.twiml.messaging_response import MessagingResponse
-from twilio.request_validator import RequestValidator
-
-from config import TWILIO_AUTH_TOKEN
-from services.gemini_ai import get_ai_reply
-from services.supabase import log_interaction
+import os
+from supabase import create_client, Client
+import google.generativeai as genai
 
 router = APIRouter()
-request_validator = RequestValidator(TWILIO_AUTH_TOKEN) if TWILIO_AUTH_TOKEN else None
 
+# Initialize Supabase & Gemini
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") # Use Service Role Key for backend writes
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-async def _validate_twilio_request(request: Request, form: dict) -> bool:
-    signature = request.headers.get("X-Twilio-Signature", "")
-    if not signature:
-        # Allow requests without signature (for testing UI)
-        return True
-    if request_validator is None:
-        return False
-    try:
-        return request_validator.validate(str(request.url), form, signature)
-    except Exception:
-        return False
-
-def _message_for_webhook(phone_number: str, body: str, call_status: str) -> str:
-    if body.strip():
-        return body.strip()
-    if call_status.lower() in {"no-answer", "busy", "failed", "canceled", "completed"}:
-        return (
-            f"Missed call from {phone_number}. Follow up with this customer "
-            "about booking a mobile auto-detailing service."
-        )
-    return f"Incoming call from {phone_number}. Follow up with this customer."
-
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 @router.post("/twilio/webhook")
-@router.post("/sms")
-async def handle_twilio_webhook(request: Request):
-    """Handle incoming SMS messages and missed-call notifications from Twilio."""
-    form = await request.form()
-    form_values = {key: str(value) for key, value in form.items()}
-
-    if not await _validate_twilio_request(request, form_values):
-        return Response(
-            content="Invalid Twilio signature",
-            status_code=403,
-            media_type="text/plain",
-        )
-
-    phone_number = str(form.get("From") or form.get("from") or "").strip()
-    body = str(form.get("Body") or form.get("body") or "")
-    call_status = str(form.get("CallStatus") or form.get("call_status") or "")
-
-    if not phone_number:
-        return Response(
-            content="Missing From phone number",
-            status_code=400,
-            media_type="text/plain",
-        )
-
-    message = _message_for_webhook(phone_number, body, call_status)
-    role = "inbound_message" if body.strip() else "inbound_call"
-    await run_in_threadpool(log_interaction, phone_number, role, message)
-
-    reply = get_ai_reply(user_id=phone_number, message=message)
-    await run_in_threadpool(log_interaction, phone_number, "ai_reply", reply)
-
+async def twilio_webhook(
+    From: str = Form(...),
+    To: str = Form(...),
+    Body: str = Form(...)
+):
     twiml = MessagingResponse()
-    twiml.message(reply)
+    
+    try:
+        # 1. Fetch the business profile matching the recipient (To) phone number
+        business_query = supabase.table("businesses").select("*").eq("twilio_number", To).execute()
+        
+        if not business_query.data:
+            # Fallback if no business matches the incoming number
+            business_name = "Our Business"
+            system_prompt = "You are an AI assistant helping a customer with an inquiry. Be polite and brief."
+            business_id = None
+        else:
+            business = business_query.data[0]
+            business_id = business["id"]
+            business_name = business["business_name"]
+            system_prompt = business["ai_system_prompt"]
+
+        # 2. Log customer message to Supabase
+        if business_id:
+            supabase.table("messages").insert({
+                "business_id": business_id,
+                "customer_phone": From,
+                "sender_role": "customer",
+                "message_body": Body
+            }).execute()
+
+        # 3. Generate response using Gemini with dynamic context
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt = f"System Instructions: {system_prompt}\nCustomer Message: {Body}"
+        
+        response = model.generate_content(prompt)
+        ai_reply = response.text.strip()
+
+        # 4. Log AI response to Supabase
+        if business_id:
+            supabase.table("messages").insert({
+                "business_id": business_id,
+                "customer_phone": From,
+                "sender_role": "ai",
+                "message_body": ai_reply
+            }).execute()
+
+        twiml.message(ai_reply)
+
+    except Exception as e:
+        # Fallback response in case of API or DB failure
+        twiml.message("Thanks for reaching out! We received your message and will get back to you shortly.")
+
     return Response(content=str(twiml), media_type="application/xml")
