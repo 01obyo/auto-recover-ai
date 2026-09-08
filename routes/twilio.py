@@ -1,16 +1,12 @@
 from fastapi import APIRouter, Form, Response
 from twilio.twiml.messaging_response import MessagingResponse
 import os
-from supabase import create_client, Client
+from config import supabase
 import google.generativeai as genai
 
 router = APIRouter()
 
-# Initialize Supabase & Gemini
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 @router.post("/twilio/webhook")
