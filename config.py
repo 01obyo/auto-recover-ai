@@ -1,9 +1,8 @@
 import os
-
+from supabase import create_client, Client
 
 def _get_env(key: str) -> str:
     return os.environ.get(key, "").strip()
-
 
 GEMINI_API_KEY = _get_env("GEMINI_API_KEY")
 SUPABASE_URL = _get_env("SUPABASE_URL")
@@ -11,6 +10,17 @@ SUPABASE_KEY = _get_env("SUPABASE_KEY")
 TELEGRAM_BOT_TOKEN = _get_env("TELEGRAM_BOT_TOKEN")
 TWILIO_AUTH_TOKEN = _get_env("TWILIO_AUTH_TOKEN")
 SENTRY_DSN = _get_env("SENTRY_DSN")
+
+# Initialize shared Supabase client safely with fallback
+try:
+    if SUPABASE_URL and SUPABASE_KEY:
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    else:
+        supabase = None
+        print("Warning: Supabase credentials missing during config init.")
+except Exception as e:
+    supabase = None
+    print(f"Warning: Failed to initialize Supabase client: {e}")
 
 HUMAN_SYSTEM_PROMPT = """
 You are Alex, the booking receptionist at Apex Mobile Auto Detailing.
