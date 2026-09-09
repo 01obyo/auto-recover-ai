@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from config import SENTRY_DSN
 from routes.telegram import router as telegram_router
 from routes.twilio import router as twilio_router
+from routes.auth import router as auth_router  # <-- Added new Auth Router import
 
 sentry_sdk.init(dsn=SENTRY_DSN, traces_sample_rate=1.0)
 
@@ -14,6 +15,7 @@ app = FastAPI(title="AutoRecover AI Engine")
 
 app.include_router(telegram_router)
 app.include_router(twilio_router)
+app.include_router(auth_router)  # <-- Registered Auth Router here
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -30,7 +32,7 @@ async def web_sandbox_chat(Body: str = Form(...)):
 
     reply = get_ai_reply(user_id="web_demo_user", message=Body)
     return {"reply": reply}
-from fastapi.responses import HTMLResponse
+
 
 @app.get("/test-ui", response_class=HTMLResponse)
 async def test_ui():
