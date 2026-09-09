@@ -1,12 +1,11 @@
-from fastapi import APIRouter, Form, Response
-from twilio.twiml.messaging_response import MessagingResponse
+from fastapi import APIRouter, Form, Response, HTTPException
 import os
 from config import supabase
 import google.generativeai as genai
+from services.dispatcher import send_channel_response
 
 router = APIRouter()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 @router.post("/twilio/webhook")
@@ -15,10 +14,11 @@ async def twilio_webhook(
     To: str = Form(...),
     Body: str = Form(...)
 ):
-    twiml = MessagingResponse()
-    
     try:
-        # 1. Fetch business profile
+        # 1. Determine channel type based on sender prefix
+        channel = "whatsapp" if From.startswith("whatsapp:") else "sms"
+        
+        # 2. Fetch business profile
         business_query = supabase.table("businesses").select("*").eq("twilio_number", To).execute()
         
         if not business_query.data:
@@ -29,7 +29,7 @@ async def twilio_webhook(
             business_id = business["id"]
             system_prompt = business["ai_system_prompt"]
 
-        # 2. Fetch past conversation history (last 6 messages) for memory context
+        # 3. Fetch past conversation history (last 6 messages) for memory context
         history_context = ""
         if business_id:
             past_messages = (
@@ -42,7 +42,6 @@ async def twilio_webhook(
                 .execute()
             )
             
-            # Format history in chronological order
             if past_messages.data:
                 formatted_history = [
                     f"{msg['sender_role'].upper()}: {msg['message_body']}"
@@ -50,7 +49,7 @@ async def twilio_webhook(
                 ]
                 history_context = "\n".join(formatted_history)
 
-        # 3. Save incoming customer message
+        # 4. Save incoming customer message
         if business_id:
             supabase.table("messages").insert({
                 "business_id": business_id,
@@ -59,7 +58,7 @@ async def twilio_webhook(
                 "message_body": Body
             }).execute()
 
-        # 4. Generate response with System Prompt + Conversation History
+        # 5. Generate response with System Prompt + Conversation History
         model = genai.GenerativeModel("gemini-1.5-flash")
         
         full_prompt = f"""System Instructions: {system_prompt}
@@ -72,7 +71,7 @@ New Customer Message: {Body}"""
         response = model.generate_content(full_prompt)
         ai_reply = response.text.strip()
 
-        # 5. Save AI response
+        # 6. Save AI response to Supabase
         if business_id:
             supabase.table("messages").insert({
                 "business_id": business_id,
@@ -81,9 +80,17 @@ New Customer Message: {Body}"""
                 "message_body": ai_reply
             }).execute()
 
-        twiml.message(ai_reply)
+        # 7. Dispatch back through the exact matching channel
+        await send_channel_response(
+            channel=channel,
+            recipient=From,
+            message=ai_reply,
+            business_twilio_number=To
+        )
+
+        return {"status": "success", "channel": channel, "reply": ai_reply}
 
     except Exception as e:
-        twiml.message("Thanks for reaching out! We received your message and will get back to you shortly.")
-
-    return Response(content=str(twiml), media_type="application/xml")
+        # Fallback safe response
+        fallback_msg = "Thanks for reaching out! We received your message and will get back to you shortly."
+        return {"status": "error", "message": str(e), "fallback": fallback_msg}
