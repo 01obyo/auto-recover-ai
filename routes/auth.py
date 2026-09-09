@@ -12,7 +12,6 @@ class SignUpSchema(BaseModel):
     business_name: str
     business_type: str
     owner_phone: str
-    twilio_number: str
     services_offered: str
     business_hours: str
     location_address: str
@@ -68,7 +67,7 @@ async def request_verification_code(payload: OTPRequestSchema):
 
 @router.post("/signup")
 async def register_business_account(payload: SignUpSchema):
-    """Registers account, ensures metadata is saved, and prevents missing records."""
+    """Registers account, assigns master platform Twilio routing, and enforces active subscription status."""
     try:
         # 1. Register user in Supabase Auth
         auth_res = supabase.auth.sign_up({
@@ -81,22 +80,25 @@ async def register_business_account(payload: SignUpSchema):
 
         user_id = auth_res.user.id
 
-        # 2. Check if business profile already exists to prevent duplicates
-        existing_biz = supabase.table("businesses").select("id").eq("owner_id", user_id).execute()
+        # 2. Check if business profile already exists and enforce account active status
+        existing_biz = supabase.table("businesses").select("id, is_active").eq("owner_id", user_id).execute()
         if existing_biz.data:
+            if not existing_biz.data[0].get("is_active", True):
+                raise HTTPException(status_code=403, detail="Account suspended. Please renew your subscription.")
             return {"status": "success", "message": "Account already exists.", "session": auth_res.session}
 
-        # 3. Insert mandatory business profile metadata
+        # 3. Insert business profile with master platform Twilio number and active status flag
         biz_data = {
             "owner_id": user_id,
             "business_name": payload.business_name,
             "business_type": payload.business_type,
             "owner_phone": payload.owner_phone,
-            "twilio_number": payload.twilio_number,
+            "twilio_number": "+1800555RECALL", # Master platform routing number owned by you
             "services_offered": payload.services_offered,
             "business_hours": payload.business_hours,
             "location_address": payload.location_address,
-            "faq_notes": payload.faq_notes
+            "faq_notes": payload.faq_notes,
+            "is_active": True # Toggle to false in Supabase when subscription expires
         }
         
         db_res = supabase.table("businesses").insert(biz_data).execute()
