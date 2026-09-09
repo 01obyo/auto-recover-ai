@@ -31,7 +31,7 @@
                     </button>
                 </div>
 
-                <!-- VIEW 2: SIGN UP & BUSINESS ONBOARDING FORM -->
+                <!-- VIEW 2: SIGN UP & BUSINESS ONBOARDING FORM (No Twilio input needed) -->
                 <div id="view-signup" class="hidden space-y-4">
                     <h2 class="text-base font-bold text-blue-100 mb-1">Business Setup</h2>
                     <form id="signup-form" onsubmit="handleSignup(event)" class="space-y-3">
@@ -53,24 +53,23 @@
                                 <input type="text" id="su-type" required placeholder="Plumber" class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
                             </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Owner Phone</label>
-                                <input type="text" id="su-owner-phone" required placeholder="+1..." class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
-                            </div>
-                            <div>
-                                <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Twilio Number</label>
-                                <input type="text" id="su-twilio" required placeholder="+1..." class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
-                            </div>
+                        <div>
+                            <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Owner Mobile Phone (For Lead Alerts)</label>
+                            <input type="text" id="su-owner-phone" required placeholder="+1..." class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
                         </div>
                         <div>
                             <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Services & Pricing</label>
                             <textarea id="su-services" rows="2" required placeholder="Leak repair ($100), Pipe install ($300)" class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400"></textarea>
                         </div>
-                        <div>
-                            <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Business Hours & Location</label>
-                            <input type="text" id="su-hours" required placeholder="Mon-Fri 8am-5pm" class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white mb-2 focus:outline-none focus:border-blue-400">
-                            <input type="text" id="su-address" required placeholder="123 Main St, City" class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Business Hours</label>
+                                <input type="text" id="su-hours" required placeholder="Mon-Fri 8am-5pm" class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Location Address</label>
+                                <input type="text" id="su-address" required placeholder="123 Main St, City" class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
+                            </div>
                         </div>
                         <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition mt-3 shadow-lg shadow-blue-600/20">
                             Complete Setup & Launch
@@ -101,14 +100,16 @@
             </div>
         </div>
 
-        <!-- ================= DASHBOARD VIEW (Hidden until logged in) ================= -->
+        <!-- ================= DASHBOARD VIEW ================= -->
         <div id="dashboard-view" class="hidden p-4 space-y-5">
             
-            <!-- Top Header -->
+            <!-- Top Header with Dynamic Greeting -->
             <div class="flex justify-between items-center px-2 pt-2">
-                <div class="flex items-center space-x-2">
-                    <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-600/40">R</div>
-                    <span class="text-xl font-bold tracking-tight text-white">Recall</span>
+                <div>
+                    <div class="flex items-center space-x-2 mb-0.5">
+                        <span id="dynamic-greeting" class="text-xs font-semibold text-blue-300/80">Good Afternoon, David</span>
+                    </div>
+                    <h1 class="text-xl font-bold tracking-tight text-white">Recall Dashboard</h1>
                 </div>
                 <div class="flex items-center space-x-3">
                     <button class="w-10 h-10 rounded-2xl bg-blue-950/60 border border-blue-500/20 flex items-center justify-center text-blue-300 hover:text-white transition">
@@ -120,7 +121,7 @@
                 </div>
             </div>
 
-            <!-- Hero Metric Card (Glassmorphism Gradient) -->
+            <!-- Hero Metric Card -->
             <div class="bg-gradient-to-br from-blue-900/80 via-blue-950/90 to-slate-950 border border-blue-500/30 p-6 rounded-3xl shadow-2xl relative overflow-hidden">
                 <div class="absolute -right-10 -top-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
                 <p class="text-xs font-medium text-blue-300/70 uppercase tracking-wider mb-1">Total Revenue Saved / Recovered</p>
@@ -147,7 +148,7 @@
                 </div>
             </div>
 
-            <!-- Top Holdings / Recent Recovered Leads -->
+            <!-- Recent Recovered Leads -->
             <div class="space-y-3">
                 <div class="flex justify-between items-center px-1">
                     <h3 class="text-sm font-bold text-blue-100">Recent Recovered Leads</h3>
@@ -155,8 +156,6 @@
                 </div>
 
                 <div class="bg-blue-950/40 backdrop-blur-xl border border-blue-500/20 rounded-3xl p-4 space-y-3">
-                    
-                    <!-- Lead Item 1 -->
                     <div class="flex items-center justify-between p-2 rounded-2xl hover:bg-blue-900/30 transition">
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center font-bold justify-center text-blue-400 text-sm">MC</div>
@@ -171,7 +170,6 @@
                         </div>
                     </div>
 
-                    <!-- Lead Item 2 -->
                     <div class="flex items-center justify-between p-2 rounded-2xl hover:bg-blue-900/30 transition border-t border-blue-500/10">
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center font-bold justify-center text-blue-400 text-sm">SK</div>
@@ -185,11 +183,10 @@
                             <p class="text-[9px] text-slate-400">42m ago</p>
                         </div>
                     </div>
-
                 </div>
             </div>
 
-            <!-- Mini Activity Chart Mock -->
+            <!-- Recovery Analytics -->
             <div class="bg-blue-950/40 backdrop-blur-xl border border-blue-500/20 rounded-3xl p-5 space-y-3">
                 <div class="flex justify-between items-center">
                     <h3 class="text-xs font-bold text-blue-100 uppercase tracking-wider">Recovery Analytics</h3>
@@ -238,8 +235,17 @@
 
     </div>
 
-    <!-- Script Logic for Session & Navigation Handling -->
+    <!-- Scripting for Dynamic Greeting & API Connection -->
     <script>
+        function updateGreeting() {
+            const hour = new Date().getHours();
+            let greeting = "Good Evening";
+            if (hour < 12) greeting = "Good Morning";
+            else if (hour < 18) greeting = "Good Afternoon";
+            
+            document.getElementById('dynamic-greeting').innerText = `${greeting}, David`;
+        }
+
         function switchView(viewId) {
             document.getElementById('view-auth-choice').classList.add('hidden');
             document.getElementById('view-signup').classList.add('hidden');
@@ -248,6 +254,7 @@
         }
 
         function showDashboard() {
+            updateGreeting();
             document.getElementById('auth-flow-container').classList.add('hidden');
             document.getElementById('dashboard-view').classList.remove('hidden');
             document.getElementById('bottom-nav').classList.remove('hidden');
@@ -261,7 +268,6 @@
                 business_name: document.getElementById('su-name').value,
                 business_type: document.getElementById('su-type').value,
                 owner_phone: document.getElementById('su-owner-phone').value,
-                twilio_number: document.getElementById('su-twilio').value,
                 services_offered: document.getElementById('su-services').value,
                 business_hours: document.getElementById('su-hours').value,
                 location_address: document.getElementById('su-address').value,
@@ -288,10 +294,7 @@
 
         async function handleLogin(e) {
             e.preventDefault();
-            const email = document.getElementById('li-email').value;
-            const password = document.getElementById('li-password').value;
-            
-            // Direct mock token storage for testing persistent entry
+            // Test mock token activation for smooth review
             localStorage.setItem('recall_token', 'active_session_token');
             showDashboard();
         }
@@ -301,7 +304,6 @@
             location.reload();
         }
 
-        // Persistent login check on load
         window.onload = function() {
             const token = localStorage.getItem('recall_token');
             if(token) {
