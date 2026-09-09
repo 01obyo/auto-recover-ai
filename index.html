@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -173,6 +172,35 @@
       letter-spacing: -0.04em;
     }
 
+
+    .auth-screen {
+      background:
+        radial-gradient(circle at 0% 0%, rgba(144,224,239,.85), transparent 34%),
+        radial-gradient(circle at 100% 12%, rgba(72,202,228,.40), transparent 30%),
+        linear-gradient(160deg, #eefbff 0%, #f5f9fe 56%, #f6f8fc 100%);
+    }
+
+    .auth-orb {
+      position: absolute;
+      border-radius: 999px;
+      filter: blur(2px);
+      pointer-events: none;
+    }
+
+    .auth-tab.active {
+      background: #fff;
+      color: #03045e;
+      box-shadow: 0 4px 14px rgba(3, 4, 94, .10);
+    }
+
+    .auth-button {
+      transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease;
+    }
+
+    .auth-button:active { transform: scale(.985); }
+
+    .hidden-view { display: none !important; }
+
     @media (min-width: 900px) {
       body { display: grid; place-items: center; padding: 26px; }
       #app-shell {
@@ -190,10 +218,85 @@
 
 <body>
   <div id="app-shell" class="relative min-h-screen mesh-bg flex flex-col">
+
+    <!-- =========================================================
+         AUTHENTICATION SCREEN
+         ========================================================= -->
+    <section id="authScreen" class="hidden absolute inset-0 z-[100] overflow-y-auto auth-screen">
+      <div class="relative min-h-full flex items-center justify-center px-5 py-8">
+        <div class="auth-orb w-36 h-36 -top-8 -right-10 bg-recall-300/30"></div>
+        <div class="auth-orb w-44 h-44 -bottom-12 -left-12 bg-recall-500/15"></div>
+
+        <div class="relative w-full max-w-[390px]">
+          <div class="text-center mb-7">
+            <div class="mx-auto w-16 h-16 rounded-[22px] dark-hero grid place-items-center text-white shadow-glow">
+              <svg width="29" height="29" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M7 4.8C7 3.806 7.806 3 8.8 3h1.3a1 1 0 0 1 .94.658l1.07 3.018a1 1 0 0 1-.32 1.094l-1.37 1.14a12.6 12.6 0 0 0 4.67 4.67l1.14-1.37a1 1 0 0 1 1.094-.32l3.018 1.07a1 1 0 0 1 .658.94v1.3A1.8 1.8 0 0 1 19.2 17C12.462 17 7 11.538 7 4.8Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M16.6 3.8a4.6 4.6 0 0 1 3.6 3.6M16.6 6.1a2.3 2.3 0 0 1 1.3 1.3" stroke="#90E0EF" stroke-width="1.7" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <p class="mt-4 text-[11px] uppercase tracking-[0.22em] font-extrabold text-recall-800">Recall</p>
+            <h2 id="authHeading" class="mt-2 text-[31px] leading-[1.05] font-black tracking-[-0.045em] text-slate-950">Welcome back.</h2>
+            <p id="authSubheading" class="mt-3 text-sm leading-relaxed text-slate-500">Sign in to monitor recovered leads, bookings and revenue in real time.</p>
+          </div>
+
+          <div class="rounded-[30px] bg-white/95 border border-white shadow-soft p-5">
+            <div class="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-slate-100">
+              <button id="authSignInTab" type="button" class="auth-tab active rounded-xl py-2.5 text-xs font-extrabold">Sign In</button>
+              <button id="authSignUpTab" type="button" class="auth-tab rounded-xl py-2.5 text-xs font-extrabold text-slate-500">Create Account</button>
+            </div>
+
+            <form id="signInForm" class="mt-6 space-y-4" novalidate>
+              <div>
+                <label for="signInEmail" class="text-xs font-bold text-slate-600">Email address</label>
+                <input id="signInEmail" class="input mt-1.5 w-full rounded-2xl px-4 py-3.5 text-sm" type="email" autocomplete="email" placeholder="you@business.com" required />
+              </div>
+              <div>
+                <div class="flex items-center justify-between">
+                  <label for="signInPassword" class="text-xs font-bold text-slate-600">Password</label>
+                  <button id="forgotPasswordButton" type="button" class="text-[11px] font-bold text-recall-800 hover:text-recall-950">Forgot password?</button>
+                </div>
+                <input id="signInPassword" class="input mt-1.5 w-full rounded-2xl px-4 py-3.5 text-sm" type="password" autocomplete="current-password" placeholder="••••••••" required />
+              </div>
+              <button id="signInButton" type="submit" class="auth-button w-full rounded-2xl py-3.5 bg-recall-950 text-white text-sm font-extrabold shadow-glow">Sign in</button>
+              <p id="signInMessage" class="hidden text-center text-xs font-semibold"></p>
+            </form>
+
+            <form id="signUpForm" class="hidden mt-6 space-y-4" novalidate>
+              <div>
+                <label for="signUpName" class="text-xs font-bold text-slate-600">Your name</label>
+                <input id="signUpName" class="input mt-1.5 w-full rounded-2xl px-4 py-3.5 text-sm" type="text" autocomplete="name" placeholder="Your full name" required />
+              </div>
+              <div>
+                <label for="signUpBusiness" class="text-xs font-bold text-slate-600">Business name</label>
+                <input id="signUpBusiness" class="input mt-1.5 w-full rounded-2xl px-4 py-3.5 text-sm" type="text" autocomplete="organization" placeholder="Your business" required />
+              </div>
+              <div>
+                <label for="signUpEmail" class="text-xs font-bold text-slate-600">Email address</label>
+                <input id="signUpEmail" class="input mt-1.5 w-full rounded-2xl px-4 py-3.5 text-sm" type="email" autocomplete="email" placeholder="you@business.com" required />
+              </div>
+              <div>
+                <label for="signUpPassword" class="text-xs font-bold text-slate-600">Password</label>
+                <input id="signUpPassword" class="input mt-1.5 w-full rounded-2xl px-4 py-3.5 text-sm" type="password" autocomplete="new-password" minlength="6" placeholder="At least 6 characters" required />
+              </div>
+              <button id="signUpButton" type="submit" class="auth-button w-full rounded-2xl py-3.5 bg-recall-950 text-white text-sm font-extrabold shadow-glow">Create my Recall account</button>
+              <p id="signUpMessage" class="hidden text-center text-xs font-semibold"></p>
+              <p class="text-center text-[10px] leading-relaxed text-slate-400">Secure email &amp; password authentication powered by Supabase.</p>
+            </form>
+          </div>
+
+          <div class="mt-5 flex items-center justify-center gap-2">
+            <span class="status-dot bg-emerald-500"></span>
+            <span class="text-[10px] font-bold text-slate-400">Your dashboard stays private to your account</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- =========================
          APP HEADER
          ========================= -->
-    <header class="px-5 pt-5 pb-3 shrink-0">
+    <header id="appHeader" class="px-5 pt-5 pb-3 shrink-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <div class="w-11 h-11 rounded-2xl dark-hero grid place-items-center text-white shadow-glow">
@@ -435,7 +538,7 @@
     <!-- =========================
          BOTTOM NAVIGATION
          ========================= -->
-    <nav class="absolute bottom-0 left-0 right-0 px-4 pt-3 bg-white/88 backdrop-blur-xl border-t border-slate-200/80 safe-bottom z-20">
+    <nav id="bottomNav" class="absolute bottom-0 left-0 right-0 px-4 pt-3 bg-white/88 backdrop-blur-xl border-t border-slate-200/80 safe-bottom z-20">
       <div class="grid grid-cols-3 gap-2">
         <button class="nav-pill active rounded-2xl px-3 py-2.5 text-slate-500 flex flex-col items-center gap-1.5" data-view-btn="home">
           <span class="nav-icon w-8 h-7 rounded-xl grid place-items-center">
@@ -472,7 +575,7 @@
        Replace ONLY the two Supabase values below.
        NEVER put a service_role key in frontend code.
        ========================================================= */
-        const CONFIG = {
+    const CONFIG = {
       SUPABASE_URL: "https://qyfxijdzayvaietjonzw.supabase.co",
       SUPABASE_ANON_KEY: "sb_publishable_7alITN25Zpj99xS8QFf2Tw_kLHC5j70",
 
@@ -496,6 +599,11 @@
       activeView: "home",
       activeLeadFilter: "all",
       channel: null
+    };
+
+    const authState = {
+      mode: "signin",
+      busy: false
     };
 
     /* =========================================================
@@ -666,6 +774,117 @@
     }
 
     /* =========================================================
+       AUTHENTICATION
+       ========================================================= */
+    async function handleSignIn(event) {
+      event.preventDefault();
+      if (!state.supabase || authState.busy) return;
+      const email = $("#signInEmail").value.trim();
+      const password = $("#signInPassword").value;
+      if (!email || !password) {
+        showAuthMessage("Please enter your email and password.", "error", "#signInMessage");
+        return;
+      }
+      authState.busy = true;
+      clearAuthMessages();
+      setAuthButtonLoading($("#signInButton"), true, "Signing in…", "Sign in");
+      try {
+        const { data, error } = await state.supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        state.user = data?.user || null;
+        if (!state.user) throw new Error("Authentication succeeded but no user session was returned.");
+        hideAuthScreen();
+        await bootstrapData();
+      } catch (error) {
+        console.error("Sign in failed:", error);
+        showAuthMessage(error.message || "Unable to sign in.", "error", "#signInMessage");
+      } finally {
+        authState.busy = false;
+        setAuthButtonLoading($("#signInButton"), false, "Signing in…", "Sign in");
+      }
+    }
+
+    async function handleSignUp(event) {
+      event.preventDefault();
+      if (!state.supabase || authState.busy) return;
+      const fullName = $("#signUpName").value.trim();
+      const businessName = $("#signUpBusiness").value.trim();
+      const email = $("#signUpEmail").value.trim();
+      const password = $("#signUpPassword").value;
+      if (!fullName || !businessName || !email || !password) {
+        showAuthMessage("Please complete all fields.", "error", "#signUpMessage");
+        return;
+      }
+      if (password.length < 6) {
+        showAuthMessage("Password must contain at least 6 characters.", "error", "#signUpMessage");
+        return;
+      }
+      authState.busy = true;
+      clearAuthMessages();
+      setAuthButtonLoading($("#signUpButton"), true, "Creating account…", "Create my Recall account");
+      try {
+        const { data, error } = await state.supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: fullName, business_name: businessName } }
+        });
+        if (error) throw error;
+        if (data?.session && data?.user) {
+          state.user = data.user;
+          await ensureBusinessProfile({ businessName, ownerName: fullName });
+          hideAuthScreen();
+          await bootstrapData();
+        } else {
+          showAuthMessage("Account created. Check your email to confirm your account, then sign in.", "success", "#signUpMessage");
+          setTimeout(() => { setAuthMode("signin"); $("#signInEmail").value = email; }, 1400);
+        }
+      } catch (error) {
+        console.error("Sign up failed:", error);
+        showAuthMessage(error.message || "Unable to create your account.", "error", "#signUpMessage");
+      } finally {
+        authState.busy = false;
+        setAuthButtonLoading($("#signUpButton"), false, "Creating account…", "Create my Recall account");
+      }
+    }
+
+    async function handleForgotPassword() {
+      if (!state.supabase) return;
+      const email = $("#signInEmail").value.trim();
+      if (!email) {
+        showAuthMessage("Enter your email address first.", "error", "#signInMessage");
+        return;
+      }
+      try {
+        const { error } = await state.supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+        if (error) throw error;
+        showAuthMessage("Password reset instructions have been sent to your email.", "success", "#signInMessage");
+      } catch (error) {
+        showAuthMessage(error.message || "Unable to send the reset email.", "error", "#signInMessage");
+      }
+    }
+
+    async function ensureBusinessProfile({ businessName = "", ownerName = "" } = {}) {
+      if (!state.supabase || !state.user) return null;
+      const existing = await fetchBusiness();
+      if (existing) { state.business = existing; return existing; }
+      const payload = {
+        owner_id: state.user.id,
+        business_name: businessName || getFirst(state.user.user_metadata || {}, ["business_name"], "My Business"),
+        owner_name: ownerName || getFirst(state.user.user_metadata || {}, ["full_name", "name"], ""),
+        is_active: true
+      };
+      const { data, error } = await state.supabase.from(CONFIG.BUSINESS_TABLE).insert(payload).select("*").single();
+      if (error) {
+        const retry = await fetchBusiness();
+        if (retry) { state.business = retry; return retry; }
+        console.warn("Business profile could not be created:", error);
+        return null;
+      }
+      state.business = data || null;
+      return state.business;
+    }
+
+    /* =========================================================
        SUPABASE / SESSION
        ========================================================= */
     function initSupabase() {
@@ -676,31 +895,41 @@
         !CONFIG.SUPABASE_ANON_KEY.includes("YOUR_SUPABASE_ANON_KEY");
 
       if (!hasConfig || !window.supabase?.createClient) {
-        renderDemoState();
+        console.error("Recall: Supabase configuration/client is missing.");
+        showAuthScreen();
+        showAuthMessage("Supabase is not configured correctly. Check your project URL and publishable key.", "error", "#signInMessage");
         return false;
       }
 
       state.supabase = window.supabase.createClient(
         CONFIG.SUPABASE_URL,
         CONFIG.SUPABASE_ANON_KEY,
-        {
-          auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true
-          }
-        }
+        { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
       );
 
       state.supabase.auth.onAuthStateChange(async (_event, session) => {
-        state.user = session?.user || null;
+        const nextUser = session?.user || null;
+        const previousUserId = state.user?.id || null;
+        state.user = nextUser;
 
         if (!state.user) {
-          renderSignedOutState();
+          handleSignedOut();
           return;
         }
 
-        await bootstrapData();
+        if (previousUserId === state.user.id && state.business) {
+          hideAuthScreen();
+          return;
+        }
+
+        hideAuthScreen();
+
+        try {
+          await bootstrapData();
+        } catch (error) {
+          console.error("Auth bootstrap failed:", error);
+          showToast(error.message || "Unable to load your Recall account.", "error");
+        }
       });
 
       return true;
@@ -713,14 +942,30 @@
       return state.user;
     }
 
+
+    function handleSignedOut() {
+      state.user = null;
+      state.business = null;
+      state.leads = [];
+      if (state.channel && state.supabase) {
+        state.supabase.removeChannel(state.channel);
+        state.channel = null;
+      }
+      showAuthScreen();
+      setAuthMode("signin");
+    }
+
+    // Compatibility wrapper used by the rest of the application.
+    function renderSignedOutState() {
+      handleSignedOut();
+    }
+
     async function signOut() {
       if (!state.supabase) return;
       const { error } = await state.supabase.auth.signOut();
       if (error) {
         showToast(error.message, "error");
-        return;
       }
-      showToast("Signed out.", "success");
     }
 
     /* =========================================================
@@ -837,6 +1082,11 @@
     }
 
     async function bootstrapData() {
+      if (!state.supabase || !state.user) {
+        renderSignedOutState();
+        return;
+      }
+
       setLoading(true);
       try {
         await requireSession();
@@ -846,7 +1096,13 @@
           return;
         }
 
-        state.business = await fetchBusiness();
+        hideAuthScreen();
+
+        if (!state.business) {
+          await ensureBusinessProfile();
+        }
+
+        state.business = state.business || await fetchBusiness();
         state.leads = await fetchLeads(state.business);
 
         renderAll();
@@ -1068,58 +1324,8 @@
     }
 
     function renderDemoState() {
-      // Demo records keep the interface visually complete while config is being connected.
-      // They are not mixed into Supabase state once valid credentials are supplied.
-      state.user = {
-        id: "demo-user",
-        email: "owner@example.com",
-        user_metadata: { full_name: "Demo Owner" }
-      };
-      state.business = {
-        id: "demo-business",
-        name: "Your Business",
-        owner_name: "Demo Owner",
-        is_active: true,
-        currency: "NGN",
-        routing_number: "+2348012345678"
-      };
-
-      state.leads = [
-        {
-          id: "1",
-          name: "Amina Okafor",
-          phone: "+2348031234567",
-          status: "Booked",
-          recovered_revenue: 185000,
-          created_at: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
-          summary: "AI follow-up converted a missed call into a confirmed appointment."
-        },
-        {
-          id: "2",
-          name: "Daniel Eze",
-          phone: "+2348097654321",
-          status: "Pending",
-          recovered_revenue: 0,
-          created_at: new Date(Date.now() - 39 * 60 * 1000).toISOString(),
-          summary: "Follow-up is waiting for customer confirmation."
-        },
-        {
-          id: "3",
-          name: "Chioma Bello",
-          phone: "+2348123456789",
-          status: "Inquiry",
-          recovered_revenue: 75000,
-          created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-          summary: "Caller requested a quote and is being nurtured by Recall."
-        }
-      ];
-
-      renderAll();
-      showToast("Demo mode — add your Supabase keys to go live.", "dark");
-    }
-
-    function renderSignedOutState() {
-      showToast("No active session. Sign in through your existing auth flow.", "error");
+      // Demo data intentionally disabled in production.
+      renderSignedOutState();
     }
 
     /* =========================================================
@@ -1256,6 +1462,13 @@
 
       $("#saveProfileButton").addEventListener("click", saveProfile);
       $("#signOutButton").addEventListener("click", signOut);
+
+      // Authentication controls.
+      $("#authSignInTab").addEventListener("click", () => setAuthMode("signin"));
+      $("#authSignUpTab").addEventListener("click", () => setAuthMode("signup"));
+      $("#signInForm").addEventListener("submit", handleSignIn);
+      $("#signUpForm").addEventListener("submit", handleSignUp);
+      $("#forgotPasswordButton").addEventListener("click", handleForgotPassword);
     }
 
     /* =========================================================
@@ -1264,21 +1477,28 @@
     (async function boot() {
       wireEvents();
       switchView("home");
+      setAuthMode("signin");
 
       const configured = initSupabase();
 
-      if (configured) {
-        try {
-          await requireSession();
-          if (!state.user) {
-            renderSignedOutState();
-          } else {
-            await bootstrapData();
-          }
-        } catch (error) {
-          console.error(error);
-          renderErrorState(error);
+      if (!configured) {
+        renderSignedOutState();
+        return;
+      }
+
+      try {
+        await requireSession();
+
+        if (!state.user) {
+          renderSignedOutState();
+        } else {
+          hideAuthScreen();
+          await bootstrapData();
         }
+      } catch (error) {
+        console.error("Recall boot error:", error);
+        state.user = null;
+        renderSignedOutState();
       }
     })();
   </script>
