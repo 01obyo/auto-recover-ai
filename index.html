@@ -1,309 +1,1285 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recall - AI Missed-Call Recovery</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  <meta name="theme-color" content="#03045e" />
+  <meta name="description" content="Recall — autonomous AI missed-call recovery and booking dashboard" />
+  <title>Recall — Missed-call recovery</title>
+
+  <!-- Tailwind CSS CDN: this single-file build needs no bundler. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            recall: {
+              950: "#03045E",
+              900: "#052A72",
+              800: "#0077B6",
+              700: "#0096C7",
+              600: "#00B4D8",
+              500: "#48CAE4",
+              300: "#90E0EF",
+              100: "#CAF0F8",
+            }
+          },
+          boxShadow: {
+            glow: "0 20px 60px rgba(0, 180, 216, .20)",
+            soft: "0 12px 40px rgba(3, 4, 94, .10)"
+          },
+          animation: {
+            float: "float 6s ease-in-out infinite",
+            pulseSoft: "pulseSoft 2.2s ease-in-out infinite",
+            shimmer: "shimmer 1.8s linear infinite"
+          },
+          keyframes: {
+            float: {
+              "0%,100%": { transform: "translateY(0px)" },
+              "50%": { transform: "translateY(-8px)" }
+            },
+            pulseSoft: {
+              "0%,100%": { opacity: ".65" },
+              "50%": { opacity: "1" }
+            },
+            shimmer: {
+              "0%": { transform: "translateX(-120%)" },
+              "100%": { transform: "translateX(220%)" }
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Supabase browser client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #07122e;
+      --muted: #71809f;
+      --line: #e7edf7;
+      --surface: #ffffff;
+      --soft: #f5f8fd;
+      --brand: #00b4d8;
+      --brand-dark: #03045e;
+    }
+
+    * { -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      min-height: 100%;
+      background: #f5f8fd;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      overscroll-behavior-y: none;
+    }
+
+    button, input {
+      font: inherit;
+    }
+
+    .safe-bottom {
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+
+    .glass {
+      background: rgba(255,255,255,.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .mesh-bg {
+      background:
+        radial-gradient(circle at 0% 0%, rgba(144,224,239,.70), transparent 38%),
+        radial-gradient(circle at 100% 20%, rgba(72,202,228,.34), transparent 32%),
+        linear-gradient(180deg, #eefbff 0%, #f6f9fd 44%, #f5f8fd 100%);
+    }
+
+    .dark-hero {
+      background:
+        radial-gradient(circle at 92% 2%, rgba(0,180,216,.38), transparent 28%),
+        radial-gradient(circle at 7% 98%, rgba(72,202,228,.18), transparent 26%),
+        linear-gradient(135deg, #03045e 0%, #052a72 47%, #0077b6 100%);
+    }
+
+    .card {
+      border: 1px solid rgba(231,237,247,.95);
+      box-shadow: 0 12px 34px rgba(3, 4, 94, .06);
+    }
+
+    .thin-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+    .thin-scrollbar::-webkit-scrollbar-thumb {
+      background: #c9d5e8;
+      border-radius: 999px;
+    }
+
+    .nav-pill.active {
+      background: #03045e;
+      color: #fff;
+      box-shadow: 0 8px 22px rgba(3, 4, 94, .20);
+    }
+
+    .nav-pill.active .nav-icon {
+      background: rgba(255,255,255,.13);
+    }
+
+    .input {
+      border: 1px solid #dfe7f2;
+      background: #fff;
+      outline: none;
+      transition: .18s ease;
+    }
+
+    .input:focus {
+      border-color: #48cae4;
+      box-shadow: 0 0 0 4px rgba(72,202,228,.13);
+    }
+
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 999px;
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+
+    .skeleton {
+      position: relative;
+      overflow: hidden;
+      background: #e8eef6;
+    }
+
+    .skeleton::after {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 -45%;
+      width: 40%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent);
+      animation: shimmer 1.8s linear infinite;
+    }
+
+    .metric-value {
+      letter-spacing: -0.04em;
+    }
+
+    @media (min-width: 900px) {
+      body { display: grid; place-items: center; padding: 26px; }
+      #app-shell {
+        width: min(440px, 100%);
+        min-height: 880px;
+        max-height: calc(100vh - 52px);
+        border-radius: 34px;
+        overflow: hidden;
+        box-shadow: 0 24px 90px rgba(3,4,94,.18);
+        border: 1px solid rgba(255,255,255,.9);
+      }
+    }
+  </style>
 </head>
-<body class="bg-[#040D1A] text-slate-100 min-h-screen flex flex-col justify-between font-sans selection:bg-blue-500 selection:text-white">
 
-    <!-- MAIN APP CONTAINER -->
-    <div id="app-viewport" class="max-w-md w-full mx-auto flex flex-col flex-grow pb-24">
-        
-        <!-- ================= AUTH VIEW ================= -->
-        <div id="auth-flow-container" class="p-6 flex flex-col justify-center flex-grow">
-            <div class="text-center mb-8">
-                <h1 class="text-3xl font-extrabold tracking-tight text-white mb-2">Recall</h1>
-                <p class="text-sm text-blue-300/70">Autonomous Missed-Call Recovery & Booking</p>
-            </div>
-
-            <div class="bg-gradient-to-b from-blue-950/60 to-slate-900/80 backdrop-blur-2xl border border-blue-500/20 p-6 rounded-3xl shadow-2xl">
-                
-                <!-- VIEW 1: AUTH CHOICE -->
-                <div id="view-auth-choice" class="space-y-4">
-                    <button onclick="switchAuthView('view-signup')" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 px-4 rounded-2xl transition shadow-lg shadow-blue-600/30">
-                        Create Business Account
-                    </button>
-                    <button onclick="switchAuthView('view-login')" class="w-full bg-blue-950/40 hover:bg-blue-900/50 text-blue-200 font-semibold py-3.5 px-4 rounded-2xl transition border border-blue-500/20">
-                        Sign In
-                    </button>
-                </div>
-
-                <!-- VIEW 2: SIGN UP -->
-                <div id="view-signup" class="hidden space-y-4">
-                    <h2 class="text-base font-bold text-blue-100 mb-1">Business Setup</h2>
-                    <form id="signup-form" onsubmit="handleSignup(event)" class="space-y-3">
-                        <div>
-                            <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Business Email</label>
-                            <input type="email" id="su-email" required class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-400">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Password</label>
-                            <input type="password" id="su-password" required class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-400">
-                        </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Business Name</label>
-                                <input type="text" id="su-name" required placeholder="Apex Plumbing" class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
-                            </div>
-                            <div>
-                                <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Trade / Type</label>
-                                <input type="text" id="su-type" required placeholder="Plumber" class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Owner Mobile Phone (For Alerts)</label>
-                            <input type="text" id="su-owner-phone" required placeholder="+1..." class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Services & Pricing</label>
-                            <textarea id="su-services" rows="2" required placeholder="Leak repair ($100)" class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400"></textarea>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Business Hours</label>
-                                <input type="text" id="su-hours" required placeholder="Mon-Fri 8am-5pm" class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
-                            </div>
-                            <div>
-                                <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Location Address</label>
-                                <input type="text" id="su-address" required placeholder="123 Main St" class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-400">
-                            </div>
-                        </div>
-                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition mt-3 shadow-lg shadow-blue-600/20">
-                            Complete Setup & Launch
-                        </button>
-                    </form>
-                    <button onclick="switchAuthView('view-auth-choice')" class="w-full text-xs text-blue-300/60 hover:text-white mt-2">Back</button>
-                </div>
-
-                <!-- VIEW 3: LOGIN -->
-                <div id="view-login" class="hidden space-y-4">
-                    <h2 class="text-base font-bold text-blue-100 mb-1">Welcome Back</h2>
-                    <form id="login-form" onsubmit="handleLogin(event)" class="space-y-3">
-                        <div>
-                            <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Email</label>
-                            <input type="email" id="li-email" required class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-400">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-medium text-blue-300/70 mb-1">Password</label>
-                            <input type="password" id="li-password" required class="w-full bg-slate-950/80 border border-blue-500/30 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-400">
-                        </div>
-                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition mt-3 shadow-lg shadow-blue-600/20">
-                            Sign In
-                        </button>
-                    </form>
-                    <button onclick="switchAuthView('view-auth-choice')" class="w-full text-xs text-blue-300/60 hover:text-white mt-2">Back</button>
-                </div>
-
-            </div>
+<body>
+  <div id="app-shell" class="relative min-h-screen mesh-bg flex flex-col">
+    <!-- =========================
+         APP HEADER
+         ========================= -->
+    <header class="px-5 pt-5 pb-3 shrink-0">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl dark-hero grid place-items-center text-white shadow-glow">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M7 4.8C7 3.806 7.806 3 8.8 3h1.3a1 1 0 0 1 .94.658l1.07 3.018a1 1 0 0 1-.32 1.094l-1.37 1.14a12.6 12.6 0 0 0 4.67 4.67l1.14-1.37a1 1 0 0 1 1.094-.32l3.018 1.07a1 1 0 0 1 .658.94v1.3A1.8 1.8 0 0 1 19.2 17c-6.738 0-12.2-5.462-12.2-12.2Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16.6 3.8a4.6 4.6 0 0 1 3.6 3.6M16.6 6.1a2.3 2.3 0 0 1 1.3 1.3" stroke="#90E0EF" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-[11px] uppercase tracking-[0.19em] font-bold text-recall-800">Recall</p>
+            <h1 id="pageTitle" class="text-lg font-bold tracking-tight">Dashboard</h1>
+          </div>
         </div>
 
-        <!-- ================= DASHBOARD VIEW ================= -->
-        <div id="dashboard-view" class="hidden p-4 space-y-5">
-            
-            <!-- Top Header -->
-            <div class="flex justify-between items-center px-2 pt-2">
-                <div>
-                    <span id="dynamic-greeting" class="text-xs font-semibold text-blue-300/80">Good Afternoon, David</span>
-                    <h1 class="text-xl font-bold tracking-tight text-white">Recall Dashboard</h1>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <button onclick="handleLogout()" class="w-10 h-10 rounded-2xl bg-blue-950/60 border border-blue-500/20 flex items-center justify-center text-blue-300 hover:text-white transition">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                    </button>
-                </div>
+        <button id="refreshButton" class="w-10 h-10 rounded-2xl bg-white border border-slate-200 grid place-items-center shadow-soft" title="Refresh data" aria-label="Refresh data">
+          <svg id="refreshIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20 11a8.1 8.1 0 0 0-14.8-3.8L4 9m0 0V5m0 4h4M4 13a8.1 8.1 0 0 0 14.8 3.8L20 15m0 0v4m0-4h-4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- =========================
+         MAIN VIEW CONTAINER
+         ========================= -->
+    <main id="mainView" class="flex-1 overflow-y-auto thin-scrollbar px-5 pb-28">
+      <!-- HOME VIEW -->
+      <section data-view="home" class="view space-y-4">
+        <div class="dark-hero rounded-[28px] p-5 text-white shadow-glow overflow-hidden relative">
+          <div class="absolute -right-10 -top-10 w-40 h-40 rounded-full border border-white/10"></div>
+          <div class="absolute -right-20 -top-2 w-44 h-44 rounded-full border border-white/5"></div>
+
+          <div class="relative z-10">
+            <p id="greetingLine" class="text-sm text-white/72">Good afternoon</p>
+            <div class="mt-1 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="businessGreeting" class="text-[25px] leading-tight font-extrabold tracking-[-0.03em]">
+                  Welcome back
+                </h2>
+                <p id="ownerSubline" class="mt-2 text-xs leading-relaxed text-white/65 max-w-[250px]">
+                  Your AI recovery system is monitoring missed calls.
+                </p>
+              </div>
+              <div class="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/10">
+                <span class="status-dot bg-emerald-300 animate-pulseSoft"></span>
+                <span class="text-[11px] font-semibold">Live</span>
+              </div>
             </div>
 
-            <!-- TAB 1: HOME (Metrics & Status) -->
-            <div id="tab-home" class="space-y-4">
-                <div class="bg-gradient-to-br from-blue-900/80 via-blue-950/90 to-slate-950 border border-blue-500/30 p-6 rounded-3xl shadow-2xl relative overflow-hidden">
-                    <p class="text-xs font-medium text-blue-300/70 uppercase tracking-wider mb-1">Total Revenue Recovered</p>
-                    <h2 class="text-3xl font-black text-white tracking-tight mb-3">$4,280.<span class="text-blue-400 font-bold text-xl">00</span></h2>
-                    
-                    <div class="flex items-center space-x-2 bg-blue-500/10 border border-blue-500/20 w-fit px-3 py-1 rounded-full text-xs text-blue-300 mb-4">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span>AI Assistant Active & Listening</span>
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-2">
-                        <div class="bg-blue-600/30 border border-blue-400/30 py-2.5 px-2 rounded-2xl text-xs font-semibold text-center flex flex-col items-center justify-center">
-                            <span class="text-[10px] text-blue-300/70 mb-0.5">Calls</span>
-                            <span>14 Caught</span>
-                        </div>
-                        <div class="bg-blue-600/30 border border-blue-400/30 py-2.5 px-2 rounded-2xl text-xs font-semibold text-center flex flex-col items-center justify-center">
-                            <span class="text-[10px] text-blue-300/70 mb-0.5">Booked</span>
-                            <span>9 Confirmed</span>
-                        </div>
-                        <div class="bg-blue-600/30 border border-blue-400/30 py-2.5 px-2 rounded-2xl text-xs font-semibold text-center flex flex-col items-center justify-center">
-                            <span class="text-[10px] text-blue-300/70 mb-0.5">Rate</span>
-                            <span>64%</span>
-                        </div>
-                    </div>
-                </div>
+            <div class="mt-5 grid grid-cols-2 gap-2">
+              <div class="rounded-2xl bg-white/8 border border-white/10 p-3">
+                <p class="text-[10px] uppercase tracking-wider text-white/50">Recovery this month</p>
+                <p id="heroRevenue" class="mt-1 text-[20px] font-extrabold">$0</p>
+              </div>
+              <div class="rounded-2xl bg-white/8 border border-white/10 p-3">
+                <p class="text-[10px] uppercase tracking-wider text-white/50">Live leads</p>
+                <p id="heroLeads" class="mt-1 text-[20px] font-extrabold">0</p>
+              </div>
             </div>
-
-            <!-- TAB 2: LEADS (Interactive Lead Inbox) -->
-            <div id="tab-leads" class="hidden space-y-3">
-                <div class="flex justify-between items-center px-1">
-                    <h3 class="text-sm font-bold text-blue-100">Client Recovery Inbox</h3>
-                    <span class="text-xs text-blue-400 font-medium">Live Feed</span>
-                </div>
-                <div class="bg-blue-950/40 backdrop-blur-xl border border-blue-500/20 rounded-3xl p-4 space-y-3">
-                    <div class="flex items-center justify-between p-2 rounded-2xl bg-blue-900/30 border border-blue-500/10">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center font-bold justify-center text-blue-400 text-sm">MC</div>
-                            <div>
-                                <h4 class="text-xs font-bold text-white">Mike Chandler</h4>
-                                <p class="text-[10px] text-blue-300/60">+1 (555) 234-5678 • Booked Pipe Repair</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-xs font-bold text-emerald-400">+$300</span>
-                            <p class="text-[9px] text-slate-400">10m ago</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between p-2 rounded-2xl bg-blue-900/30 border border-blue-500/10">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center font-bold justify-center text-blue-400 text-sm">SJ</div>
-                            <div>
-                                <h4 class="text-xs font-bold text-white">Sarah Jenkins</h4>
-                                <p class="text-[10px] text-blue-300/60">+1 (555) 987-6543 • Inquiry: Leak Check</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-xs font-bold text-blue-300">Pending</span>
-                            <p class="text-[9px] text-slate-400">42m ago</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB 3: ACCOUNT (Business Profile & Management) -->
-            <div id="tab-account" class="hidden space-y-4">
-                <div class="bg-blue-950/40 backdrop-blur-xl border border-blue-500/20 rounded-3xl p-5 space-y-4">
-                    <h3 class="text-sm font-bold text-blue-100 border-b border-blue-500/20 pb-2">Business Profile Settings</h3>
-                    <div class="space-y-2 text-xs">
-                        <div class="flex justify-between"><span class="text-blue-300/60">Subscription Status:</span><span class="text-emerald-400 font-bold">Active (Platform Managed)</span></div>
-                        <div class="flex justify-between"><span class="text-blue-300/60">Assigned Routing:</span><span class="text-white font-mono">+1800555RECALL</span></div>
-                        <div class="flex justify-between"><span class="text-blue-300/60">Owner Alert Phone:</span><span class="text-white">+1 (Primary Line)</span></div>
-                    </div>
-                    <button onclick="handleLogout()" class="w-full bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 font-semibold py-2.5 rounded-xl transition text-xs">
-                        Sign Out of Account
-                    </button>
-                </div>
-            </div>
-
+          </div>
         </div>
 
-        <!-- ================= FUNCTIONAL BOTTOM NAVIGATION BAR ================= -->
-        <div id="bottom-nav" class="hidden fixed bottom-0 left-0 right-0 max-w-md mx-auto p-3 bg-[#040D1A]/90 backdrop-blur-xl border-t border-blue-500/20 z-50">
-            <div class="flex justify-around items-center">
-                <button onclick="switchDashboardTab('tab-home', event)" id="nav-btn-home" class="flex flex-col items-center text-blue-400 space-y-1 transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-                    <span class="text-[10px] font-medium">Home</span>
-                </button>
-                <button onclick="switchDashboardTab('tab-leads', event)" id="nav-btn-leads" class="flex flex-col items-center text-blue-300/60 hover:text-blue-400 space-y-1 transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-                    <span class="text-[10px] font-medium">Leads</span>
-                </button>
-                <button onclick="switchDashboardTab('tab-account', event)" id="nav-btn-account" class="flex flex-col items-center text-blue-300/60 hover:text-blue-400 space-y-1 transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                    <span class="text-[10px] font-medium">Account</span>
-                </button>
+        <!-- METRICS -->
+        <div class="grid grid-cols-2 gap-3">
+          <article class="card rounded-3xl bg-white p-4">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-recall-100 text-recall-950 grid place-items-center">
+                <span class="text-base font-bold">₦</span>
+              </div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Recovered</span>
             </div>
+            <p class="metric-value mt-3 text-[24px] font-extrabold" id="metricRevenue">₦0</p>
+            <p class="mt-1 text-xs text-slate-400">Revenue recovered</p>
+          </article>
+
+          <article class="card rounded-3xl bg-white p-4">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-cyan-50 text-recall-800 grid place-items-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 15.5v1.6a2 2 0 0 1-2.2 2A17.4 17.4 0 0 1 3 3.2 2 2 0 0 1 5 1h1.6a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L7.7 8.7a14 14 0 0 0 7.6 7.6l1.1-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7A2 2 0 0 1 21 15.5Z" stroke="currentColor" stroke-width="1.7"/></svg>
+              </div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Calls</span>
+            </div>
+            <p class="metric-value mt-3 text-[24px] font-extrabold" id="metricCalls">0</p>
+            <p class="mt-1 text-xs text-slate-400">Caught by Recall</p>
+          </article>
+
+          <article class="card rounded-3xl bg-white p-4">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 grid place-items-center">
+                <span class="text-base font-extrabold">✓</span>
+              </div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Booked</span>
+            </div>
+            <p class="metric-value mt-3 text-[24px] font-extrabold" id="metricBooked">0</p>
+            <p class="mt-1 text-xs text-slate-400">Appointments won</p>
+          </article>
+
+          <article class="card rounded-3xl bg-white p-4">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 grid place-items-center">
+                <span class="text-base font-extrabold">%</span>
+              </div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rate</span>
+            </div>
+            <p class="metric-value mt-3 text-[24px] font-extrabold" id="metricConversion">0%</p>
+            <p class="mt-1 text-xs text-slate-400">Call → booking</p>
+          </article>
         </div>
 
+        <!-- LIVE LEAD FEED -->
+        <section class="card rounded-3xl bg-white overflow-hidden">
+          <div class="px-4 py-4 flex items-center justify-between border-b border-slate-100">
+            <div>
+              <h3 class="font-bold">Live recovery feed</h3>
+              <p class="text-[11px] text-slate-400 mt-0.5">Recent missed calls and AI outcomes</p>
+            </div>
+            <button data-go="leads" class="text-xs font-bold text-recall-800 hover:text-recall-950">
+              View all
+            </button>
+          </div>
+          <div id="homeLeadFeed" class="divide-y divide-slate-100"></div>
+        </section>
+
+        <!-- SYSTEM HEALTH -->
+        <section class="rounded-3xl p-4 bg-slate-950 text-white shadow-soft">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs text-white/45">Recovery system</p>
+              <p class="mt-0.5 font-bold">Autonomous mode</p>
+            </div>
+            <div class="flex items-center gap-1.5 text-[11px] font-bold text-emerald-300">
+              <span class="status-dot bg-emerald-300"></span> Operational
+            </div>
+          </div>
+          <div class="mt-4 grid grid-cols-3 gap-2">
+            <div class="rounded-2xl bg-white/5 p-3">
+              <p class="text-[10px] text-white/40">Listening</p>
+              <p class="mt-1 text-sm font-bold">24/7</p>
+            </div>
+            <div class="rounded-2xl bg-white/5 p-3">
+              <p class="text-[10px] text-white/40">Follow-ups</p>
+              <p class="mt-1 text-sm font-bold">AI</p>
+            </div>
+            <div class="rounded-2xl bg-white/5 p-3">
+              <p class="text-[10px] text-white/40">Mode</p>
+              <p class="mt-1 text-sm font-bold">Auto</p>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <!-- LEADS VIEW -->
+      <section data-view="leads" class="view hidden space-y-4">
+        <div class="rounded-3xl bg-white border border-slate-200 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="text-xl font-extrabold tracking-tight">Leads</h2>
+              <p class="mt-1 text-xs text-slate-400">Every recovery opportunity in one place.</p>
+            </div>
+            <div class="px-2.5 py-1.5 rounded-full bg-recall-100 text-recall-950 text-[10px] font-extrabold">
+              <span id="leadCount">0</span> total
+            </div>
+          </div>
+
+          <div class="mt-4 flex gap-2 overflow-x-auto pb-1 thin-scrollbar">
+            <button class="filter-button active shrink-0 px-3 py-2 rounded-xl bg-recall-950 text-white text-xs font-bold" data-filter="all">All</button>
+            <button class="filter-button shrink-0 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold" data-filter="Booked">Booked</button>
+            <button class="filter-button shrink-0 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold" data-filter="Pending">Pending</button>
+            <button class="filter-button shrink-0 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold" data-filter="Inquiry">Inquiry</button>
+          </div>
+        </div>
+
+        <div id="leadsList" class="space-y-3"></div>
+      </section>
+
+      <!-- PROFILE VIEW -->
+      <section data-view="profile" class="view hidden space-y-4">
+        <div class="dark-hero rounded-3xl p-5 text-white shadow-glow">
+          <div class="flex items-center gap-3">
+            <div id="profileAvatar" class="w-12 h-12 rounded-2xl bg-white/12 border border-white/10 grid place-items-center font-extrabold text-lg">R</div>
+            <div class="min-w-0">
+              <p id="profileBusinessName" class="font-extrabold truncate">Your business</p>
+              <p id="profileOwnerName" class="text-xs text-white/55 truncate">Owner</p>
+            </div>
+          </div>
+          <div class="mt-5 flex items-center justify-between">
+            <div>
+              <p class="text-[10px] text-white/45 uppercase tracking-wider">Subscription</p>
+              <p id="subscriptionStatus" class="mt-1 text-sm font-bold">Checking…</p>
+            </div>
+            <span id="subscriptionBadge" class="px-2.5 py-1.5 rounded-full text-[10px] font-extrabold bg-white/10 border border-white/10">—</span>
+          </div>
+        </div>
+
+        <section class="card rounded-3xl bg-white p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="font-bold">Business profile</h3>
+              <p class="text-[11px] text-slate-400 mt-0.5">Pulled from Supabase in real time.</p>
+            </div>
+            <span class="text-[10px] font-bold text-recall-800 bg-recall-100 px-2 py-1 rounded-full">LIVE</span>
+          </div>
+
+          <div class="mt-4 space-y-3">
+            <label class="block">
+              <span class="text-[11px] font-bold text-slate-500">Business name</span>
+              <input id="businessNameInput" class="input mt-1.5 w-full rounded-2xl px-3.5 py-3 text-sm" type="text" />
+            </label>
+            <label class="block">
+              <span class="text-[11px] font-bold text-slate-500">Owner name</span>
+              <input id="ownerNameInput" class="input mt-1.5 w-full rounded-2xl px-3.5 py-3 text-sm" type="text" />
+            </label>
+            <label class="block">
+              <span class="text-[11px] font-bold text-slate-500">Routing number</span>
+              <input id="routingNumberInput" class="input mt-1.5 w-full rounded-2xl px-3.5 py-3 text-sm" type="tel" inputmode="tel" autocomplete="tel" placeholder="+234…" />
+              <p class="mt-1 text-[10px] text-slate-400">International E.164 format is supported, e.g. +2348012345678.</p>
+            </label>
+            <button id="saveProfileButton" class="w-full rounded-2xl py-3.5 bg-recall-950 text-white text-sm font-extrabold shadow-glow">
+              Save settings
+            </button>
+          </div>
+        </section>
+
+        <section class="card rounded-3xl bg-white p-4">
+          <h3 class="font-bold">Account</h3>
+          <div class="mt-3 space-y-2">
+            <div class="flex items-center justify-between rounded-2xl bg-slate-50 px-3.5 py-3">
+              <span class="text-xs text-slate-500">Signed in as</span>
+              <span id="accountEmail" class="text-xs font-bold max-w-[210px] truncate">—</span>
+            </div>
+            <button id="signOutButton" class="w-full rounded-2xl py-3.5 border border-rose-200 bg-rose-50 text-rose-600 text-sm font-extrabold">
+              Sign out
+            </button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <!-- =========================
+         BOTTOM NAVIGATION
+         ========================= -->
+    <nav class="absolute bottom-0 left-0 right-0 px-4 pt-3 bg-white/88 backdrop-blur-xl border-t border-slate-200/80 safe-bottom z-20">
+      <div class="grid grid-cols-3 gap-2">
+        <button class="nav-pill active rounded-2xl px-3 py-2.5 text-slate-500 flex flex-col items-center gap-1.5" data-view-btn="home">
+          <span class="nav-icon w-8 h-7 rounded-xl grid place-items-center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m4 11 8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1v-8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="text-[10px] font-extrabold">Home</span>
+        </button>
+
+        <button class="nav-pill rounded-2xl px-3 py-2.5 text-slate-500 flex flex-col items-center gap-1.5" data-view-btn="leads">
+          <span class="nav-icon w-8 h-7 rounded-xl grid place-items-center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 7.5h12M6 12h8M6 16.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="18.2" cy="12" r="2" fill="currentColor"/></svg>
+          </span>
+          <span class="text-[10px] font-extrabold">Leads</span>
+        </button>
+
+        <button class="nav-pill rounded-2xl px-3 py-2.5 text-slate-500 flex flex-col items-center gap-1.5" data-view-btn="profile">
+          <span class="nav-icon w-8 h-7 rounded-xl grid place-items-center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 20c.8-3.5 3-5.2 6.5-5.2s5.7 1.7 6.5 5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <span class="text-[10px] font-extrabold">Profile</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- TOAST -->
+    <div id="toast" class="pointer-events-none fixed left-1/2 -translate-x-1/2 bottom-24 hidden z-50">
+      <div class="rounded-2xl bg-slate-950 text-white px-4 py-3 text-xs font-bold shadow-2xl"></div>
     </div>
+  </div>
 
-    <!-- Script Logic -->
-    <script>
-        function updateGreeting() {
-            const hour = new Date().getHours();
-            let greeting = "Good Evening";
-            if (hour < 12) greeting = "Good Morning";
-            else if (hour < 18) greeting = "Good Afternoon";
-            
-            document.getElementById('dynamic-greeting').innerText = `${greeting}, David`;
+  <script>
+    /* =========================================================
+       RECALL FRONTEND CONFIG
+       Replace ONLY the two Supabase values below.
+       NEVER put a service_role key in frontend code.
+       ========================================================= */
+    const CONFIG = {
+      SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
+      SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY",
+
+      // Optional FastAPI base URL for future authenticated actions.
+      // Example: "https://api.example.com"
+      FASTAPI_BASE_URL: "",
+
+      // Tables used by the UI.
+      BUSINESS_TABLE: "businesses",
+      LEADS_TABLE: "leads"
+    };
+
+    /* =========================================================
+       APPLICATION STATE
+       ========================================================= */
+    const state = {
+      supabase: null,
+      user: null,
+      business: null,
+      leads: [],
+      activeView: "home",
+      activeLeadFilter: "all",
+      channel: null
+    };
+
+    /* =========================================================
+       SMALL UTILITIES
+       ========================================================= */
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+    function safeText(value, fallback = "—") {
+      return value === null || value === undefined || String(value).trim() === ""
+        ? fallback
+        : String(value).trim();
+    }
+
+    function getFirst(obj, keys, fallback = null) {
+      for (const key of keys) {
+        const value = obj?.[key];
+        if (value !== null && value !== undefined && String(value).trim() !== "") {
+          return value;
+        }
+      }
+      return fallback;
+    }
+
+    function titleCase(value) {
+      return String(value || "")
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/\b\w/g, (m) => m.toUpperCase());
+    }
+
+    function normalizeStatus(status) {
+      const raw = String(status || "Inquiry").trim().toLowerCase();
+      if (["booked", "confirmed", "appointment", "scheduled", "won"].includes(raw)) return "Booked";
+      if (["pending", "follow up", "follow-up", "contacted", "recovering"].includes(raw)) return "Pending";
+      if (["inquiry", "new", "lead", "missed", "open"].includes(raw)) return "Inquiry";
+      return titleCase(raw) || "Inquiry";
+    }
+
+    function statusClasses(status) {
+      const value = normalizeStatus(status);
+      if (value === "Booked") return {
+        text: "text-emerald-700",
+        bg: "bg-emerald-50",
+        dot: "bg-emerald-500"
+      };
+      if (value === "Pending") return {
+        text: "text-amber-700",
+        bg: "bg-amber-50",
+        dot: "bg-amber-500"
+      };
+      return {
+        text: "text-recall-800",
+        bg: "bg-recall-100",
+        dot: "bg-recall-600"
+      };
+    }
+
+    function formatCurrency(value, currency = "NGN") {
+      const amount = Number(value || 0);
+      if (!Number.isFinite(amount)) return currency === "NGN" ? "₦0" : "$0";
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency,
+          maximumFractionDigits: 0
+        }).format(amount);
+      } catch {
+        return currency === "NGN" ? `₦${Math.round(amount).toLocaleString()}` : `$${Math.round(amount).toLocaleString()}`;
+      }
+    }
+
+    function formatRelativeTime(dateValue) {
+      if (!dateValue) return "No timestamp";
+      const date = new Date(dateValue);
+      if (Number.isNaN(date.getTime())) return "Just now";
+
+      const diff = Date.now() - date.getTime();
+      const sec = Math.max(0, Math.floor(diff / 1000));
+
+      if (sec < 45) return "Just now";
+      if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+      if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+      if (sec < 604800) return `${Math.floor(sec / 86400)}d ago`;
+
+      return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    }
+
+    function initials(name) {
+      const words = String(name || "R").trim().split(/\s+/).slice(0, 2);
+      return words.map(w => w[0]).join("").toUpperCase() || "R";
+    }
+
+    function greetingByHour() {
+      const hour = new Date().getHours();
+      if (hour < 12) return "Good morning";
+      if (hour < 18) return "Good afternoon";
+      return "Good evening";
+    }
+
+    function sanitizePhone(raw) {
+      if (!raw) return "";
+      const input = String(raw).trim();
+      // Keep + and digits. This supports E.164 while being forgiving of spaces/dashes.
+      const cleaned = input.replace(/[^\d+]/g, "");
+      if (cleaned.startsWith("+")) return "+" + cleaned.slice(1).replace(/\+/g, "");
+      return cleaned.replace(/\+/g, "");
+    }
+
+    function leadName(lead) {
+      return safeText(getFirst(lead, ["customer_name", "client_name", "name", "contact_name", "caller_name", "full_name"]), "Unknown caller");
+    }
+
+    function leadPhone(lead) {
+      return safeText(getFirst(lead, ["phone", "customer_phone", "client_phone", "caller_phone", "phone_number"]), "No number");
+    }
+
+    function leadTimestamp(lead) {
+      return getFirst(lead, ["updated_at", "created_at", "received_at", "called_at", "timestamp"]);
+    }
+
+    function leadRevenue(lead) {
+      return Number(getFirst(lead, [
+        "recovered_revenue",
+        "revenue_recovered",
+        "amount_recovered",
+        "booking_value",
+        "recovered_amount",
+        "revenue",
+        "value"
+      ], 0)) || 0;
+    }
+
+    function isBooked(lead) {
+      return normalizeStatus(getFirst(lead, ["status", "lead_status", "outcome", "stage"], "Inquiry")) === "Booked";
+    }
+
+    function isCallCaught(lead) {
+      const explicit = getFirst(lead, ["call_caught", "caught", "is_recovered", "recovered", "missed_call_recovered"]);
+      if (explicit !== null) return Boolean(explicit);
+      // In the absence of a call flag, an existing lead row is treated as a caught opportunity.
+      return true;
+    }
+
+    function monthStartISO() {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    }
+
+    function showToast(message, tone = "dark") {
+      const toast = $("#toast");
+      const box = toast.firstElementChild;
+      box.textContent = message;
+      box.className = "rounded-2xl px-4 py-3 text-xs font-bold shadow-2xl " +
+        (tone === "success" ? "bg-emerald-600 text-white" :
+         tone === "error" ? "bg-rose-600 text-white" :
+         "bg-slate-950 text-white");
+      toast.classList.remove("hidden");
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => toast.classList.add("hidden"), 2600);
+    }
+
+    function setLoading(isLoading) {
+      $("#refreshIcon").classList.toggle("animate-spin", isLoading);
+      $("#refreshButton").disabled = isLoading;
+      $("#refreshButton").classList.toggle("opacity-60", isLoading);
+    }
+
+    /* =========================================================
+       SUPABASE / SESSION
+       ========================================================= */
+    function initSupabase() {
+      const hasConfig =
+        CONFIG.SUPABASE_URL &&
+        CONFIG.SUPABASE_ANON_KEY &&
+        !CONFIG.SUPABASE_URL.includes("YOUR_PROJECT") &&
+        !CONFIG.SUPABASE_ANON_KEY.includes("YOUR_SUPABASE_ANON_KEY");
+
+      if (!hasConfig || !window.supabase?.createClient) {
+        renderDemoState();
+        return false;
+      }
+
+      state.supabase = window.supabase.createClient(
+        CONFIG.SUPABASE_URL,
+        CONFIG.SUPABASE_ANON_KEY,
+        {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+          }
+        }
+      );
+
+      state.supabase.auth.onAuthStateChange(async (_event, session) => {
+        state.user = session?.user || null;
+
+        if (!state.user) {
+          renderSignedOutState();
+          return;
         }
 
-        function switchAuthView(viewId) {
-            document.getElementById('view-auth-choice').classList.add('hidden');
-            document.getElementById('view-signup').classList.add('hidden');
-            document.getElementById('view-login').classList.add('hidden');
-            document.getElementById(viewId).classList.remove('hidden');
+        await bootstrapData();
+      });
+
+      return true;
+    }
+
+    async function requireSession() {
+      const { data, error } = await state.supabase.auth.getSession();
+      if (error) throw error;
+      state.user = data.session?.user || null;
+      return state.user;
+    }
+
+    async function signOut() {
+      if (!state.supabase) return;
+      const { error } = await state.supabase.auth.signOut();
+      if (error) {
+        showToast(error.message, "error");
+        return;
+      }
+      showToast("Signed out.", "success");
+    }
+
+    /* =========================================================
+       DATA ACCESS LAYER
+       Keep all Supabase query logic here so schema changes
+       can be handled in one predictable place.
+       ========================================================= */
+    async function fetchBusiness() {
+      const user = state.user;
+      if (!user) return null;
+
+      const table = CONFIG.BUSINESS_TABLE;
+
+      // Standard pattern: businesses.owner_id references auth.users.id.
+      let query = state.supabase
+        .from(table)
+        .select("*")
+        .eq("owner_id", user.id)
+        .limit(1)
+        .maybeSingle();
+
+      let { data, error } = await query;
+
+      // Graceful fallback for teams using user_id instead of owner_id.
+      if (error && /owner_id/i.test(error.message || "")) {
+        ({ data, error } = await state.supabase
+          .from(table)
+          .select("*")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle());
+      }
+
+      if (error) throw error;
+
+      // Some schemas link business rows by auth email.
+      if (!data) {
+        const email = user.email;
+        if (email) {
+          const fallback = await state.supabase
+            .from(table)
+            .select("*")
+            .eq("email", email)
+            .limit(1)
+            .maybeSingle();
+          if (!fallback.error) data = fallback.data;
+        }
+      }
+
+      return data || null;
+    }
+
+    async function fetchLeads(business) {
+      const table = CONFIG.LEADS_TABLE;
+      const select = "*";
+      const monthISO = monthStartISO();
+
+      // Prefer business_id. If the schema is user-scoped instead, fall back to user_id.
+      let query;
+      if (business?.id) {
+        query = state.supabase
+          .from(table)
+          .select(select)
+          .eq("business_id", business.id)
+          .order("updated_at", { ascending: false })
+          .limit(250);
+      } else {
+        query = state.supabase
+          .from(table)
+          .select(select)
+          .eq("owner_id", state.user.id)
+          .order("updated_at", { ascending: false })
+          .limit(250);
+      }
+
+      let { data, error } = await query;
+
+      if (error && /updated_at/i.test(error.message || "")) {
+        // Common schema fallback: created_at is used for the feed timestamp.
+        if (business?.id) {
+          ({ data, error } = await state.supabase
+            .from(table)
+            .select(select)
+            .eq("business_id", business.id)
+            .order("created_at", { ascending: false })
+            .limit(250));
+        } else {
+          ({ data, error } = await state.supabase
+            .from(table)
+            .select(select)
+            .eq("owner_id", state.user.id)
+            .order("created_at", { ascending: false })
+            .limit(250));
+        }
+      }
+
+      if (error) {
+        // Last-resort: fetch by user_id when business_id is not part of the schema.
+        if (business?.id && /business_id/i.test(error.message || "")) {
+          ({ data, error } = await state.supabase
+            .from(table)
+            .select(select)
+            .eq("user_id", state.user.id)
+            .order("created_at", { ascending: false })
+            .limit(250));
+        }
+      }
+
+      if (error) throw error;
+
+      // Month-level filtering stays client-side to remain schema-flexible.
+      // We still keep the full recent feed in state for the Leads tab.
+      return Array.isArray(data) ? data : [];
+    }
+
+    async function bootstrapData() {
+      setLoading(true);
+      try {
+        await requireSession();
+
+        if (!state.user) {
+          renderSignedOutState();
+          return;
         }
 
-        function switchDashboardTab(tabId, event) {
-            document.getElementById('tab-home').classList.add('hidden');
-            document.getElementById('tab-leads').classList.add('hidden');
-            document.getElementById('tab-account').classList.add('hidden');
-            document.getElementById(tabId).classList.remove('hidden');
+        state.business = await fetchBusiness();
+        state.leads = await fetchLeads(state.business);
 
-            document.getElementById('nav-btn-home').className = "flex flex-col items-center text-blue-300/60 hover:text-blue-400 space-y-1 transition";
-            document.getElementById('nav-btn-leads').className = "flex flex-col items-center text-blue-300/60 hover:text-blue-400 space-y-1 transition";
-            document.getElementById('nav-btn-account').className = "flex flex-col items-center text-blue-300/60 hover:text-blue-400 space-y-1 transition";
+        renderAll();
+        subscribeRealtime();
+      } catch (error) {
+        console.error(error);
+        showToast(error.message || "Unable to load your Recall data.", "error");
+        renderErrorState(error);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-            event.currentTarget.className = "flex flex-col items-center text-blue-400 space-y-1 transition";
-        }
+    /* =========================================================
+       REALTIME
+       ========================================================= */
+    function subscribeRealtime() {
+      if (!state.supabase || !state.business?.id) return;
 
-        function showDashboard() {
-            updateGreeting();
-            document.getElementById('auth-flow-container').classList.add('hidden');
-            document.getElementById('dashboard-view').classList.remove('hidden');
-            document.getElementById('bottom-nav').classList.remove('hidden');
-        }
+      if (state.channel) {
+        state.supabase.removeChannel(state.channel);
+        state.channel = null;
+      }
 
-        async function handleSignup(e) {
-            e.preventDefault();
-            const payload = {
-                email: document.getElementById('su-email').value,
-                password: document.getElementById('su-password').value,
-                business_name: document.getElementById('su-name').value,
-                business_type: document.getElementById('su-type').value,
-                owner_phone: document.getElementById('su-owner-phone').value,
-                services_offered: document.getElementById('su-services').value,
-                business_hours: document.getElementById('su-hours').value,
-                location_address: document.getElementById('su-address').value,
-                faq_notes: ""
-            };
-
+      state.channel = state.supabase
+        .channel(`recall-leads-${state.business.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: CONFIG.LEADS_TABLE,
+            filter: `business_id=eq.${state.business.id}`
+          },
+          async () => {
+            // Re-query instead of manually patching rows so all derived metrics stay correct.
             try {
-                const res = await fetch('/api/auth/signup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if(res.ok) {
-                    localStorage.setItem('recall_token', data.session.access_token);
-                    showDashboard();
-                } else {
-                    alert(data.detail || 'Registration failed');
-                }
-            } catch(err) {
-                alert('Connection error occurred.');
+              state.leads = await fetchLeads(state.business);
+              renderAll();
+            } catch (error) {
+              console.error("Realtime refresh failed:", error);
             }
-        }
+          }
+        )
+        .subscribe();
+    }
 
-        async function handleLogin(e) {
-            e.preventDefault();
-            localStorage.setItem('recall_token', 'active_session_token');
-            showDashboard();
-        }
+    /* =========================================================
+       DERIVED METRICS
+       ========================================================= */
+    function getMonthlyLeads() {
+      const start = new Date(monthStartISO()).getTime();
+      return state.leads.filter((lead) => {
+        const t = new Date(leadTimestamp(lead) || 0).getTime();
+        return Number.isFinite(t) && t >= start;
+      });
+    }
 
-        function handleLogout() {
-            localStorage.removeItem('recall_token');
-            location.reload();
-        }
+    function calculateMetrics() {
+      const monthly = getMonthlyLeads();
+      const revenue = monthly.reduce((sum, lead) => sum + leadRevenue(lead), 0);
+      const caught = monthly.filter(isCallCaught).length;
+      const booked = monthly.filter(isBooked).length;
+      const conversion = caught > 0 ? Math.round((booked / caught) * 100) : 0;
+      return { revenue, caught, booked, conversion };
+    }
 
-        window.onload = function() {
-            const token = localStorage.getItem('recall_token');
-            if(token) {
-                showDashboard();
-            }
+    /* =========================================================
+       RENDERING
+       ========================================================= */
+    function renderIdentity() {
+      const businessName = getFirst(state.business, ["business_name", "name", "company_name"], null);
+      const ownerName = getFirst(
+        state.business,
+        ["owner_name", "full_name", "contact_name", "admin_name"],
+        getFirst(state.user?.user_metadata || {}, ["full_name", "name", "display_name"], null)
+      );
+
+      const greeting = businessName || ownerName || "Welcome back";
+
+      $("#greetingLine").textContent = greetingByHour();
+      $("#businessGreeting").textContent = businessName || greeting;
+      $("#ownerSubline").textContent = ownerName
+        ? `${ownerName}, your AI recovery system is monitoring missed calls.`
+        : "Your AI recovery system is monitoring missed calls.";
+
+      $("#profileBusinessName").textContent = businessName || "Your business";
+      $("#profileOwnerName").textContent = ownerName || "Owner";
+      $("#profileAvatar").textContent = initials(businessName || ownerName || "Recall");
+      $("#accountEmail").textContent = safeText(state.user?.email);
+
+      $("#businessNameInput").value = businessName || "";
+      $("#ownerNameInput").value = ownerName || "";
+      $("#routingNumberInput").value = getFirst(
+        state.business,
+        ["routing_number", "assigned_routing_number", "phone_number", "inbound_number"],
+        ""
+      ) || "";
+
+      const active = Boolean(getFirst(state.business, ["is_active", "active", "subscription_active"], false));
+      $("#subscriptionStatus").textContent = active ? "Your subscription is active" : "Subscription is inactive";
+      $("#subscriptionBadge").textContent = active ? "ACTIVE" : "INACTIVE";
+      $("#subscriptionBadge").className =
+        "px-2.5 py-1.5 rounded-full text-[10px] font-extrabold border " +
+        (active
+          ? "bg-emerald-400/15 text-emerald-200 border-emerald-300/20"
+          : "bg-rose-400/15 text-rose-200 border-rose-300/20");
+    }
+
+    function renderMetrics() {
+      const metrics = calculateMetrics();
+      // Adjust currency here if your business billing currency is not NGN.
+      const currency = getFirst(state.business, ["currency", "billing_currency"], "NGN") || "NGN";
+
+      $("#metricRevenue").textContent = formatCurrency(metrics.revenue, currency);
+      $("#metricCalls").textContent = metrics.caught.toLocaleString();
+      $("#metricBooked").textContent = metrics.booked.toLocaleString();
+      $("#metricConversion").textContent = `${metrics.conversion}%`;
+
+      $("#heroRevenue").textContent = formatCurrency(metrics.revenue, currency);
+      $("#heroLeads").textContent = state.leads.length.toLocaleString();
+      $("#leadCount").textContent = state.leads.length.toLocaleString();
+    }
+
+    function leadCardMarkup(lead, compact = false) {
+      const name = leadName(lead);
+      const phone = leadPhone(lead);
+      const status = normalizeStatus(getFirst(lead, ["status", "lead_status", "outcome", "stage"], "Inquiry"));
+      const styles = statusClasses(status);
+      const note = getFirst(lead, ["summary", "message", "notes", "last_message", "inquiry"], "Missed call captured. Recall is following up.");
+      const revenue = leadRevenue(lead);
+      const timestamp = formatRelativeTime(leadTimestamp(lead));
+
+      return `
+        <article class="${compact ? "px-4 py-3" : "p-4"} bg-white">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 shrink-0 rounded-2xl bg-gradient-to-br from-recall-100 to-cyan-50 text-recall-950 grid place-items-center text-xs font-extrabold">
+              ${initials(name)}
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-sm font-extrabold truncate">${escapeHtml(name)}</p>
+                  <p class="mt-0.5 text-[11px] text-slate-400 truncate">${escapeHtml(phone)}</p>
+                </div>
+                <span class="shrink-0 inline-flex items-center gap-1.5 ${styles.bg} ${styles.text} rounded-full px-2 py-1 text-[10px] font-extrabold">
+                  <span class="status-dot ${styles.dot}"></span>${escapeHtml(status)}
+                </span>
+              </div>
+              ${compact ? "" : `<p class="mt-3 text-xs text-slate-500 leading-relaxed">${escapeHtml(note)}</p>`}
+              <div class="mt-3 flex items-center justify-between gap-3">
+                <span class="text-[10px] font-semibold text-slate-400">${escapeHtml(timestamp)}</span>
+                <span class="text-[10px] font-extrabold ${revenue > 0 ? "text-emerald-600" : "text-slate-400"}">
+                  ${revenue > 0 ? "+" + formatCurrency(revenue, getFirst(state.business, ["currency"], "NGN") || "NGN") : "No revenue yet"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderHomeLeadFeed() {
+      const container = $("#homeLeadFeed");
+      const leads = state.leads.slice(0, 5);
+
+      if (!leads.length) {
+        container.innerHTML = `
+          <div class="p-6 text-center">
+            <div class="w-12 h-12 rounded-2xl bg-recall-100 text-recall-950 mx-auto grid place-items-center font-extrabold">0</div>
+            <p class="mt-3 text-sm font-bold">No recovered leads yet</p>
+            <p class="mt-1 text-xs text-slate-400">Your live recovery feed will appear here.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = leads.map((lead) => leadCardMarkup(lead, true)).join("");
+    }
+
+    function renderLeads() {
+      const filter = state.activeLeadFilter;
+      const filtered = state.leads.filter((lead) => filter === "all" || normalizeStatus(getFirst(lead, ["status", "lead_status", "outcome", "stage"], "Inquiry")) === filter);
+      const container = $("#leadsList");
+
+      if (!filtered.length) {
+        container.innerHTML = `
+          <div class="card rounded-3xl bg-white p-7 text-center">
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 grid place-items-center text-slate-500">—</div>
+            <p class="mt-3 text-sm font-bold">No ${filter === "all" ? "" : filter.toLowerCase() + " "}leads</p>
+            <p class="mt-1 text-xs text-slate-400">New recovery activity will appear here automatically.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map((lead) => {
+        return `<div class="card rounded-3xl overflow-hidden">${leadCardMarkup(lead, false)}</div>`;
+      }).join("");
+    }
+
+    function renderAll() {
+      renderIdentity();
+      renderMetrics();
+      renderHomeLeadFeed();
+      renderLeads();
+    }
+
+    function renderErrorState(error) {
+      const message = safeText(error?.message, "Data could not be loaded.");
+      $("#homeLeadFeed").innerHTML = `
+        <div class="p-6">
+          <p class="text-sm font-extrabold text-rose-600">Could not load live data</p>
+          <p class="mt-1 text-xs text-slate-500 leading-relaxed">${escapeHtml(message)}</p>
+          <button id="retryButton" class="mt-4 rounded-xl bg-slate-950 text-white px-3.5 py-2.5 text-xs font-bold">Retry</button>
+        </div>
+      `;
+      $("#retryButton")?.addEventListener("click", bootstrapData);
+    }
+
+    function renderDemoState() {
+      // Demo records keep the interface visually complete while config is being connected.
+      // They are not mixed into Supabase state once valid credentials are supplied.
+      state.user = {
+        id: "demo-user",
+        email: "owner@example.com",
+        user_metadata: { full_name: "Demo Owner" }
+      };
+      state.business = {
+        id: "demo-business",
+        name: "Your Business",
+        owner_name: "Demo Owner",
+        is_active: true,
+        currency: "NGN",
+        routing_number: "+2348012345678"
+      };
+
+      state.leads = [
+        {
+          id: "1",
+          name: "Amina Okafor",
+          phone: "+2348031234567",
+          status: "Booked",
+          recovered_revenue: 185000,
+          created_at: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
+          summary: "AI follow-up converted a missed call into a confirmed appointment."
+        },
+        {
+          id: "2",
+          name: "Daniel Eze",
+          phone: "+2348097654321",
+          status: "Pending",
+          recovered_revenue: 0,
+          created_at: new Date(Date.now() - 39 * 60 * 1000).toISOString(),
+          summary: "Follow-up is waiting for customer confirmation."
+        },
+        {
+          id: "3",
+          name: "Chioma Bello",
+          phone: "+2348123456789",
+          status: "Inquiry",
+          recovered_revenue: 75000,
+          created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+          summary: "Caller requested a quote and is being nurtured by Recall."
         }
-    </script>
+      ];
+
+      renderAll();
+      showToast("Demo mode — add your Supabase keys to go live.", "dark");
+    }
+
+    function renderSignedOutState() {
+      showToast("No active session. Sign in through your existing auth flow.", "error");
+    }
+
+    /* =========================================================
+       PROFILE SAVE
+       Updates the current business row without hard-coding a
+       database schema beyond common column names.
+       ========================================================= */
+    async function saveProfile() {
+      if (!state.supabase || !state.business?.id) {
+        showToast("Connect Supabase first.", "error");
+        return;
+      }
+
+      const businessName = $("#businessNameInput").value.trim();
+      const ownerName = $("#ownerNameInput").value.trim();
+      const routingNumber = sanitizePhone($("#routingNumberInput").value);
+
+      if (routingNumber && !/^\+[1-9]\d{7,14}$/.test(routingNumber)) {
+        showToast("Use an E.164 phone number such as +2348012345678.", "error");
+        return;
+      }
+
+      const patch = {};
+
+      // Only send fields known to exist in this common schema.
+      // For a different naming convention, change these lines in one block.
+      if (businessName) patch.business_name = businessName;
+      if (ownerName) patch.owner_name = ownerName;
+      if (routingNumber) patch.routing_number = routingNumber;
+
+      const { error } = await state.supabase
+        .from(CONFIG.BUSINESS_TABLE)
+        .update(patch)
+        .eq("id", state.business.id);
+
+      if (error) {
+        showToast(error.message, "error");
+        return;
+      }
+
+      state.business = { ...state.business, ...patch };
+      renderIdentity();
+      showToast("Profile saved.", "success");
+    }
+
+    /* =========================================================
+       OPTIONAL FASTAPI HELPER
+       The browser automatically forwards the Supabase JWT for
+       protected FastAPI endpoints. Keep FastAPI actions behind
+       your normal Bearer-token verification middleware.
+       ========================================================= */
+    async function fetchFromFastAPI(path, options = {}) {
+      if (!CONFIG.FASTAPI_BASE_URL) throw new Error("FASTAPI_BASE_URL is not configured.");
+      if (!state.supabase) throw new Error("Supabase is not initialized.");
+
+      const { data } = await state.supabase.auth.getSession();
+      const token = data?.session?.access_token;
+
+      const response = await fetch(`${CONFIG.FASTAPI_BASE_URL}${path}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `FastAPI request failed (${response.status})`);
+      }
+      return response.json();
+    }
+
+    /* =========================================================
+       NAVIGATION
+       ========================================================= */
+    function switchView(view) {
+      state.activeView = view;
+      $$(".view").forEach((section) => section.classList.toggle("hidden", section.dataset.view !== view));
+      $$(".nav-pill").forEach((button) => button.classList.toggle("active", button.dataset.viewBtn === view));
+
+      const titles = { home: "Dashboard", leads: "Lead activity", profile: "Profile" };
+      $("#pageTitle").textContent = titles[view] || "Recall";
+      $("#mainView").scrollTop = 0;
+    }
+
+    /* =========================================================
+       HTML ESCAPING
+       ========================================================= */
+    function escapeHtml(input) {
+      return String(input ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    /* =========================================================
+       EVENT WIRING
+       ========================================================= */
+    function wireEvents() {
+      $$("[data-view-btn]").forEach((button) => {
+        button.addEventListener("click", () => switchView(button.dataset.viewBtn));
+      });
+
+      $$("[data-go]").forEach((button) => {
+        button.addEventListener("click", () => switchView(button.dataset.go));
+      });
+
+      $$(".filter-button").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.activeLeadFilter = button.dataset.filter;
+          $$(".filter-button").forEach((btn) => {
+            const active = btn.dataset.filter === state.activeLeadFilter;
+            btn.classList.toggle("active", active);
+            btn.classList.toggle("bg-recall-950", active);
+            btn.classList.toggle("text-white", active);
+            btn.classList.toggle("bg-slate-100", !active);
+            btn.classList.toggle("text-slate-600", !active);
+          });
+          renderLeads();
+        });
+      });
+
+      $("#refreshButton").addEventListener("click", async () => {
+        if (state.supabase && state.user) {
+          await bootstrapData();
+        } else {
+          showToast("Demo mode is active.");
+        }
+      });
+
+      $("#saveProfileButton").addEventListener("click", saveProfile);
+      $("#signOutButton").addEventListener("click", signOut);
+    }
+
+    /* =========================================================
+       BOOT
+       ========================================================= */
+    (async function boot() {
+      wireEvents();
+      switchView("home");
+
+      const configured = initSupabase();
+
+      if (configured) {
+        try {
+          await requireSession();
+          if (!state.user) {
+            renderSignedOutState();
+          } else {
+            await bootstrapData();
+          }
+        } catch (error) {
+          console.error(error);
+          renderErrorState(error);
+        }
+      }
+    })();
+  </script>
 </body>
 </html>
