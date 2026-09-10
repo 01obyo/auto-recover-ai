@@ -773,6 +773,53 @@
       $("#refreshButton").classList.toggle("opacity-60", isLoading);
     }
 
+        function showAuthScreen() {
+      $("#authScreen").classList.remove("hidden-view");
+      $("#authScreen").classList.remove("hidden");
+    }
+
+    function hideAuthScreen() {
+      $("#authScreen").classList.add("hidden-view");
+      $("#authScreen").classList.add("hidden");
+    }
+
+    function setAuthMode(mode) {
+      authState.mode = mode;
+      const isSignIn = mode === "signin";
+      $("#authSignInTab").classList.toggle("active", isSignIn);
+      $("#authSignInTab").classList.toggle("text-slate-500", !isSignIn);
+      $("#authSignUpTab").classList.toggle("active", !isSignIn);
+      $("#authSignUpTab").classList.toggle("text-slate-500", isSignIn);
+
+      $("#signInForm").classList.toggle("hidden", !isSignIn);
+      $("#signUpForm").classList.toggle("hidden", isSignIn);
+
+      $("#authHeading").textContent = isSignIn ? "Welcome back." : "Get started.";
+      $("#authSubheading").textContent = isSignIn
+        ? "Sign in to monitor recovered leads, bookings and revenue in real time."
+        : "Create your Recall account to start recovering missed calls automatically.";
+    }
+
+    function showAuthMessage(message, type, selector) {
+      const el = $(selector);
+      if (!el) return;
+      el.textContent = message;
+      el.className = "text-center text-xs font-semibold " +
+        (type === "error" ? "text-rose-600" : "text-emerald-600");
+      el.classList.remove("hidden");
+    }
+
+    function clearAuthMessages() {
+      $("#signInMessage").classList.add("hidden");
+      $("#signUpMessage").classList.add("hidden");
+    }
+
+    function setAuthButtonLoading(button, isLoading, loadingText, defaultText) {
+      button.disabled = isLoading;
+      button.textContent = isLoading ? loadingText : defaultText;
+      button.classList.toggle("opacity-70", isLoading);
+    }
+
     /* =========================================================
        AUTHENTICATION
        ========================================================= */
