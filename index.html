@@ -1551,20 +1551,2406 @@
       $("#forgotPasswordButton")?.addEventListener("click", handleForgotPassword);
     }
 
-    /* =========================================================
-       BOOT
-       ========================================================= */
-    (async function boot() {
-      wireEvents();
-      switchView("home");
-      setAuthMode("signin");
+<script>
+/* =========================================================
+   RECALL FRONTEND CONFIG
+   Replace ONLY the Supabase values below when necessary.
+   Never put a service_role key in frontend code.
+   ========================================================= */
+const CONFIG = {
+  SUPABASE_URL: "https://qyfxijdzayvaietjonzw.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5ZnhpamR6YXl2YWlldGpvbnp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2MjAyOTAsImV4cCI6MjEwNDE5NjI5MH0.txde2HWklchF_0WNQbmJeOI0jqjn-A-x1d9fMu9w2ck",
+  FASTAPI_BASE_URL: "https://auto-recover-ai.onrender.com",
+  BUSINESS_TABLE: "businesses",
+  LEADS_TABLE: "leads"
+};
 
-      const configured = initSupabase();
+const state = {
+  supabase: null,
+  user: null,
+  business: null,
+  leads: [],
+  activeView: "home",
+  activeLeadFilter: "all",
+  channel: null,
+  isBootstrapping: false,
+  ensuringBusinessPromise: null
+};
 
-      if (!configured) {
-        renderSignedOutState();
+const authState = {
+  mode: "signin",
+  busy: false
+};
+
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+function safeText(value, fallback = "—") {
+  return value === null || value === undefined || String(value).trim() === ""
+    ? fallback
+    : String(value).trim();
+}
+
+function getFirst(obj, keys, fallback = null) {
+  for (const key of keys) {
+    const value = obj?.[key];
+    if (value !== null && value !== undefined && String(value).trim() !== "") {
+      return value;
+    }
+  }
+  return fallback;
+}
+
+function titleCase(value) {
+  return String(value || "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function normalizeStatus(status) {
+  const raw = String(status || "Inquiry").trim().toLowerCase();
+
+  if (["booked", "confirmed", "appointment", "scheduled", "won"].includes(raw)) {
+    return "Booked";
+  }
+
+  if (["pending", "follow up", "follow-up", "contacted", "recovering"].includes(raw)) {
+    return "Pending";
+  }
+
+  if (["inquiry", "new", "lead", "missed", "open"].includes(raw)) {
+    return "Inquiry";
+  }
+
+  return titleCase(raw) || "Inquiry";
+}
+
+function statusClasses(status) {
+  const value = normalizeStatus(status);
+
+  if (value === "Booked") {
+    return {
+      text: "text-emerald-700",
+      bg: "bg-emerald-50",
+      dot: "bg-emerald-500"
+    };
+  }
+
+  if (value === "Pending") {
+    return {
+      text: "text-amber-700",
+      bg: "bg-amber-50",
+      dot: "bg-amber-500"
+    };
+  }
+
+  return {
+    text: "text-recall-800",
+    bg: "bg-recall-100",
+    dot: "bg-recall-600"
+  };
+}
+
+function formatCurrency(value, currency = "NGN") {
+  const amount = Number(value || 0);
+
+  if (!Number.isFinite(amount)) {
+    return currency === "NGN" ? "₦0" : "$0";
+  }
+
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0
+    }).format(amount);
+  } catch {
+    return currency === "NGN"
+      ? `₦${Math.round(amount).toLocaleString()}`
+      : `$${Math.round(amount).toLocaleString()}`;
+  }
+}
+
+function formatRelativeTime(dateValue) {
+  if (!dateValue) return "No timestamp";
+
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Just now";
+  }
+
+  const diff = Date.now() - date.getTime();
+
+  if (diff < 0) {
+    return "Just now";
+  }
+
+  const sec = Math.floor(diff / 1000);
+
+  if (sec < 45) return "Just now";
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  if (sec < 604800) return `${Math.floor(sec / 86400)}d ago`;
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric"
+  });
+}
+
+function initials(name) {
+  const words = String(name || "R")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2);
+
+  return words.map((w) => w[0]).join("").toUpperCase() || "R";
+}
+
+function greetingByHour() {
+  const hour = new Date().getHours();
+
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function sanitizePhone(raw) {
+  if (!raw) return "";
+
+  const input = String(raw).trim();
+  const cleaned = input.replace(/[^\d+]/g, "");
+
+  if (cleaned.startsWith("+")) {
+    return "+" + cleaned.slice(1).replace(/\+/g, "");
+  }
+
+  return cleaned.replace(/\+/g, "");
+}
+
+function leadName(lead) {
+  return safeText(
+    getFirst(lead, [
+      "customer_name",
+      "client_name",
+      "name",
+      "contact_name",
+      "caller_name",
+      "full_name"
+    ]),
+    "Unknown caller"
+  );
+}
+
+function leadPhone(lead) {
+  return safeText(
+    getFirst(lead, [
+      "phone",
+      "customer_phone",
+      "client_phone",
+      "caller_phone",
+      "phone_number"
+    ]),
+    "No number"
+  );
+}
+
+function leadTimestamp(lead) {
+  return getFirst(lead, [
+    "updated_at",
+    "created_at",
+    "received_at",
+    "called_at",
+    "timestamp"
+  ]);
+}
+
+function leadRevenue(lead) {
+  return Number(
+    getFirst(
+      lead,
+      [
+        "recovered_revenue",
+        "revenue_recovered",
+        "amount_recovered",
+        "booking_value",
+        "recovered_amount",
+        "revenue",
+        "value"
+      ],
+      0
+    )
+  ) || 0;
+}
+
+function parseBoolean(value, fallback = false) {
+  if (value === true || value === false) return value;
+
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    if (["true", "1", "yes", "y", "on"].includes(normalized)) {
+      return true;
+    }
+
+    if (["false", "0", "no", "n", "off", ""].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return fallback;
+}
+
+function isBooked(lead) {
+  return (
+    normalizeStatus(
+      getFirst(
+        lead,
+        ["status", "lead_status", "outcome", "stage"],
+        "Inquiry"
+      )
+    ) === "Booked"
+  );
+}
+
+function isCallCaught(lead) {
+  const explicit = getFirst(lead, [
+    "call_caught",
+    "caught",
+    "is_recovered",
+    "recovered",
+    "missed_call_recovered"
+  ]);
+
+  return explicit === null
+    ? true
+    : parseBoolean(explicit, true);
+}
+
+function monthStartMs() {
+  const now = new Date();
+
+  return new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    1
+  ).getTime();
+}
+
+function showToast(message, tone = "dark") {
+  const toast = $("#toast");
+  const box = toast?.firstElementChild;
+
+  if (!toast || !box) return;
+
+  box.textContent = String(message || "");
+
+  box.className =
+    "rounded-2xl px-4 py-3 text-xs font-bold shadow-2xl " +
+    (
+      tone === "success"
+        ? "bg-emerald-600 text-white"
+        : tone === "error"
+          ? "bg-rose-600 text-white"
+          : "bg-slate-950 text-white"
+    );
+
+  toast.classList.remove("hidden");
+
+  clearTimeout(showToast._timer);
+
+  showToast._timer = setTimeout(() => {
+    toast.classList.add("hidden");
+  }, 2600);
+}
+
+function setLoading(isLoading) {
+  const icon = $("#refreshIcon");
+  const btn = $("#refreshButton");
+
+  icon?.classList.toggle("animate-spin", isLoading);
+
+  if (btn) {
+    btn.disabled = isLoading;
+    btn.classList.toggle("opacity-60", isLoading);
+  }
+}
+
+function showAuthScreen() {
+  $("#authScreen")?.classList.remove("hidden-view", "hidden");
+}
+
+function hideAuthScreen() {
+  $("#authScreen")?.classList.add("hidden-view", "hidden");
+}
+
+function setAuthMode(mode) {
+  authState.mode = mode;
+
+  const isSignIn = mode === "signin";
+
+  $("#authSignInTab")?.classList.toggle("active", isSignIn);
+  $("#authSignInTab")?.classList.toggle("text-slate-500", !isSignIn);
+
+  $("#authSignUpTab")?.classList.toggle("active", !isSignIn);
+  $("#authSignUpTab")?.classList.toggle("text-slate-500", isSignIn);
+
+  $("#signInForm")?.classList.toggle("hidden", !isSignIn);
+  $("#signUpForm")?.classList.toggle("hidden", isSignIn);
+
+  const heading = $("#authHeading");
+  const subheading = $("#authSubheading");
+
+  if (heading) {
+    heading.textContent = isSignIn
+      ? "Welcome back."
+      : "Get started.";
+  }
+
+  if (subheading) {
+    subheading.textContent = isSignIn
+      ? "Sign in to monitor recovered leads, bookings and revenue in real time."
+      : "Create your Recall account to start recovering missed calls automatically.";
+  }
+}
+
+function showAuthMessage(message, type, selector) {
+  const el = $(selector);
+
+  if (!el) return;
+
+  el.textContent = String(message || "");
+
+  el.className =
+    "text-center text-xs font-semibold " +
+    (type === "error"
+      ? "text-rose-600"
+      : "text-emerald-600");
+
+  el.classList.remove("hidden");
+}
+
+function clearAuthMessages() {
+  $("#signInMessage")?.classList.add("hidden");
+  $("#signUpMessage")?.classList.add("hidden");
+}
+
+function setAuthButtonLoading(
+  button,
+  isLoading,
+  loadingText,
+  defaultText
+) {
+  if (!button) return;
+
+  button.disabled = isLoading;
+  button.textContent = isLoading
+    ? loadingText
+    : defaultText;
+
+  button.classList.toggle("opacity-70", isLoading);
+}
+
+/* =========================================================
+   AUTHENTICATION
+   ========================================================= */
+async function handleSignIn(event) {
+  event.preventDefault();
+
+  if (!state.supabase || authState.busy) return;
+
+  const email =
+    $("#signInEmail")?.value.trim() || "";
+
+  const password =
+    $("#signInPassword")?.value || "";
+
+  if (!email || !password) {
+    showAuthMessage(
+      "Please enter your email and password.",
+      "error",
+      "#signInMessage"
+    );
+    return;
+  }
+
+  authState.busy = true;
+  clearAuthMessages();
+
+  setAuthButtonLoading(
+    $("#signInButton"),
+    true,
+    "Signing in…",
+    "Sign in"
+  );
+
+  try {
+    const {
+      data,
+      error
+    } = await state.supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+
+    state.user = data?.user || null;
+
+    if (!state.user) {
+      throw new Error(
+        "Authentication succeeded but no user session was returned."
+      );
+    }
+  } catch (error) {
+    console.error("Sign in failed:", error);
+
+    showAuthMessage(
+      error.message || "Unable to sign in.",
+      "error",
+      "#signInMessage"
+    );
+  } finally {
+    authState.busy = false;
+
+    setAuthButtonLoading(
+      $("#signInButton"),
+      false,
+      "Signing in…",
+      "Sign in"
+    );
+  }
+}
+
+async function handleSignUp(event) {
+  event.preventDefault();
+
+  if (!state.supabase || authState.busy) return;
+
+  const fullName =
+    $("#signUpName")?.value.trim() || "";
+
+  const businessName =
+    $("#signUpBusiness")?.value.trim() || "";
+
+  const email =
+    $("#signUpEmail")?.value.trim() || "";
+
+  const password =
+    $("#signUpPassword")?.value || "";
+
+  if (!fullName || !businessName || !email || !password) {
+    showAuthMessage(
+      "Please complete all fields.",
+      "error",
+      "#signUpMessage"
+    );
+    return;
+  }
+
+  if (password.length < 6) {
+    showAuthMessage(
+      "Password must contain at least 6 characters.",
+      "error",
+      "#signUpMessage"
+    );
+    return;
+  }
+
+  authState.busy = true;
+  clearAuthMessages();
+
+  setAuthButtonLoading(
+    $("#signUpButton"),
+    true,
+    "Creating account…",
+    "Create my Recall account"
+  );
+
+  try {
+    const {
+      data,
+      error
+    } = await state.supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          business_name: businessName
+        }
       }
-    })();
-  </script>
+    });
+
+    if (error) throw error;
+
+    if (data?.session && data?.user) {
+      state.user = data.user;
+
+      await ensureBusinessProfile({
+        businessName,
+        ownerName: fullName
+      });
+    } else {
+      showAuthMessage(
+        "Account created. Check your email to confirm your account, then sign in.",
+        "success",
+        "#signUpMessage"
+      );
+
+      setTimeout(() => {
+        setAuthMode("signin");
+
+        if ($("#signInEmail")) {
+          $("#signInEmail").value = email;
+        }
+      }, 1400);
+    }
+  } catch (error) {
+    console.error("Sign up failed:", error);
+
+    showAuthMessage(
+      error.message || "Unable to create your account.",
+      "error",
+      "#signUpMessage"
+    );
+  } finally {
+    authState.busy = false;
+
+    setAuthButtonLoading(
+      $("#signUpButton"),
+      false,
+      "Creating account…",
+      "Create my Recall account"
+    );
+  }
+}
+
+async function handleForgotPassword() {
+  if (!state.supabase) return;
+
+  const email =
+    $("#signInEmail")?.value.trim() || "";
+
+  if (!email) {
+    showAuthMessage(
+      "Enter your email address first.",
+      "error",
+      "#signInMessage"
+    );
+    return;
+  }
+
+  try {
+    const {
+      error
+    } = await state.supabase.auth.resetPasswordForEmail(
+      email,
+      {
+        redirectTo: window.location.origin
+      }
+    );
+
+    if (error) throw error;
+
+    showAuthMessage(
+      "Password reset instructions have been sent to your email.",
+      "success",
+      "#signInMessage"
+    );
+  } catch (error) {
+    showAuthMessage(
+      error.message || "Unable to send the reset email.",
+      "error",
+      "#signInMessage"
+    );
+  }
+}
+
+async function ensureBusinessProfile({
+  businessName = "",
+  ownerName = ""
+} = {}) {
+  if (!state.supabase || !state.user) return null;
+
+  if (state.business) {
+    return state.business;
+  }
+
+  if (state.ensuringBusinessPromise) {
+    return await state.ensuringBusinessPromise;
+  }
+
+  state.ensuringBusinessPromise = (async () => {
+    try {
+      const existing = await fetchBusiness();
+
+      if (existing) {
+        state.business = existing;
+        return existing;
+      }
+
+      const metadata =
+        state.user.user_metadata || {};
+
+      const bName =
+        businessName ||
+        getFirst(
+          metadata,
+          ["business_name"],
+          "My Business"
+        );
+
+      const oName =
+        ownerName ||
+        getFirst(
+          metadata,
+          ["full_name", "name"],
+          ""
+        );
+
+      let payload = {
+        owner_id: state.user.id,
+        business_name: bName,
+        owner_name: oName,
+        is_active: true
+      };
+
+      let {
+        data,
+        error
+      } = await state.supabase
+        .from(CONFIG.BUSINESS_TABLE)
+        .insert(payload)
+        .select("*")
+        .single();
+
+      if (
+        error &&
+        /owner_id/i.test(error.message || "")
+      ) {
+        payload = {
+          user_id: state.user.id,
+          business_name: bName,
+          owner_name: oName,
+          is_active: true
+        };
+
+        ({
+          data,
+          error
+        } = await state.supabase
+          .from(CONFIG.BUSINESS_TABLE)
+          .insert(payload)
+          .select("*")
+          .single());
+      }
+
+      if (error) {
+        const retry = await fetchBusiness();
+
+        if (retry) {
+          state.business = retry;
+          return retry;
+        }
+
+        console.warn(
+          "Business profile could not be created:",
+          error
+        );
+
+        return null;
+      }
+
+      state.business = data || null;
+      return state.business;
+    } finally {
+      state.ensuringBusinessPromise = null;
+    }
+  })();
+
+  return await state.ensuringBusinessPromise;
+}
+
+/* =========================================================
+   SUPABASE / SESSION
+   ========================================================= */
+function initSupabase() {
+  const hasConfig =
+    Boolean(
+      CONFIG.SUPABASE_URL &&
+      CONFIG.SUPABASE_ANON_KEY
+    );
+
+  if (
+    !hasConfig ||
+    !window.supabase?.createClient
+  ) {
+    console.error(
+      "Recall: Supabase configuration/client is missing."
+    );
+
+    showAuthScreen();
+
+    showAuthMessage(
+      "Supabase is not configured correctly. Check your project URL and publishable key.",
+      "error",
+      "#signInMessage"
+    );
+
+    return false;
+  }
+
+  state.supabase =
+    window.supabase.createClient(
+      CONFIG.SUPABASE_URL,
+      CONFIG.SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        }
+      }
+    );
+
+  state.supabase.auth.onAuthStateChange(
+    (_event, session) => {
+      const nextUser =
+        session?.user || null;
+
+      const previousUserId =
+        state.user?.id || null;
+
+      state.user = nextUser;
+
+      if (!state.user) {
+        handleSignedOut();
+        return;
+      }
+
+      hideAuthScreen();
+
+      /*
+       * Do not perform heavy asynchronous Supabase work
+       * directly inside the auth callback.
+       */
+      if (
+        previousUserId === state.user.id &&
+        state.business
+      ) {
+        return;
+      }
+
+      setTimeout(() => {
+        bootstrapData().catch((error) => {
+          console.error(
+            "Auth bootstrap failed:",
+            error
+          );
+
+          showToast(
+            error.message ||
+              "Unable to load your Recall account.",
+            "error"
+          );
+        });
+      }, 0);
+    }
+  );
+
+  return true;
+}
+
+async function requireSession() {
+  if (!state.supabase) return null;
+
+  const {
+    data,
+    error
+  } = await state.supabase.auth.getSession();
+
+  if (error) throw error;
+
+  state.user =
+    data.session?.user || null;
+
+  return state.user;
+}
+
+function handleSignedOut() {
+  state.user = null;
+  state.business = null;
+  state.leads = [];
+
+  if (state.channel && state.supabase) {
+    state.supabase.removeChannel(
+      state.channel
+    );
+
+    state.channel = null;
+  }
+
+  showAuthScreen();
+  setAuthMode("signin");
+}
+
+async function signOut() {
+  if (!state.supabase) return;
+
+  const {
+    error
+  } = await state.supabase.auth.signOut();
+
+  if (error) {
+    showToast(
+      error.message,
+      "error"
+    );
+  }
+}
+
+/* =========================================================
+   DATA ACCESS
+   ========================================================= */
+async function fetchBusiness() {
+  const user = state.user;
+
+  if (!user || !state.supabase) {
+    return null;
+  }
+
+  const table =
+    CONFIG.BUSINESS_TABLE;
+
+  let {
+    data,
+    error
+  } = await state.supabase
+    .from(table)
+    .select("*")
+    .eq("owner_id", user.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (
+    error &&
+    /owner_id/i.test(error.message || "")
+  ) {
+    ({
+      data,
+      error
+    } = await state.supabase
+      .from(table)
+      .select("*")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle());
+  }
+
+  if (error) throw error;
+
+  if (!data && user.email) {
+    const fallback =
+      await state.supabase
+        .from(table)
+        .select("*")
+        .eq("email", user.email)
+        .limit(1)
+        .maybeSingle();
+
+    if (!fallback.error) {
+      data = fallback.data;
+    }
+  }
+
+  return data || null;
+}
+
+async function fetchLeads(business) {
+  if (!state.supabase || !state.user) {
+    return [];
+  }
+
+  const table =
+    CONFIG.LEADS_TABLE;
+
+  const select = "*";
+
+  let data = null;
+  let error = null;
+
+  if (business?.id) {
+    ({
+      data,
+      error
+    } = await state.supabase
+      .from(table)
+      .select(select)
+      .eq("business_id", business.id)
+      .order("updated_at", {
+        ascending: false
+      })
+      .limit(250));
+
+    if (
+      error &&
+      /updated_at/i.test(error.message || "")
+    ) {
+      ({
+        data,
+        error
+      } = await state.supabase
+        .from(table)
+        .select(select)
+        .eq("business_id", business.id)
+        .order("created_at", {
+          ascending: false
+        })
+        .limit(250));
+    }
+  } else {
+    ({
+      data,
+      error
+    } = await state.supabase
+      .from(table)
+      .select(select)
+      .eq("owner_id", state.user.id)
+      .order("updated_at", {
+        ascending: false
+      })
+      .limit(250));
+
+    if (
+      error &&
+      /updated_at/i.test(error.message || "")
+    ) {
+      ({
+        data,
+        error
+      } = await state.supabase
+        .from(table)
+        .select(select)
+        .eq("owner_id", state.user.id)
+        .order("created_at", {
+          ascending: false
+        })
+        .limit(250));
+    }
+  }
+
+  if (
+    error &&
+    (
+      /business_id/i.test(error.message || "") ||
+      /owner_id/i.test(error.message || "")
+    )
+  ) {
+    ({
+      data,
+      error
+    } = await state.supabase
+      .from(table)
+      .select(select)
+      .eq("user_id", state.user.id)
+      .order("created_at", {
+        ascending: false
+      })
+      .limit(250));
+  }
+
+  if (error) throw error;
+
+  return Array.isArray(data)
+    ? data
+    : [];
+}
+
+async function bootstrapData() {
+  if (!state.supabase) {
+    showAuthScreen();
+    return;
+  }
+
+  if (state.isBootstrapping) {
+    return;
+  }
+
+  state.isBootstrapping = true;
+  setLoading(true);
+
+  try {
+    await requireSession();
+
+    if (!state.user) {
+      handleSignedOut();
+      return;
+    }
+
+    hideAuthScreen();
+
+    if (!state.business) {
+      await ensureBusinessProfile();
+    }
+
+    state.business =
+      state.business ||
+      await fetchBusiness();
+
+    state.leads =
+      await fetchLeads(
+        state.business
+      );
+
+    renderAll();
+    subscribeRealtime();
+  } catch (error) {
+    console.error(
+      "Bootstrap failed:",
+      error
+    );
+
+    showToast(
+      error.message ||
+        "Unable to load your Recall data.",
+      "error"
+    );
+
+    renderErrorState(error);
+  } finally {
+    state.isBootstrapping = false;
+    setLoading(false);
+  }
+}
+
+/* =========================================================
+   REALTIME
+   ========================================================= */
+function subscribeRealtime() {
+  if (
+    !state.supabase ||
+    !state.business?.id
+  ) {
+    return;
+  }
+
+  if (state.channel) {
+    state.supabase.removeChannel(
+      state.channel
+    );
+
+    state.channel = null;
+  }
+
+  state.channel =
+    state.supabase
+      .channel(
+        `recall-leads-${state.business.id}`
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: CONFIG.LEADS_TABLE,
+          filter:
+            `business_id=eq.${state.business.id}`
+        },
+        () => {
+          fetchLeads(state.business)
+            .then((leads) => {
+              state.leads = leads;
+              renderAll();
+            })
+            .catch((error) => {
+              console.error(
+                "Realtime refresh failed:",
+                error
+              );
+            });
+        }
+      )
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR") {
+          console.error(
+            "Recall realtime channel error."
+          );
+        }
+      });
+}
+
+/* =========================================================
+   FASTAPI LEAD SUBMISSION
+   IMPORTANT:
+   This function does NOT require Supabase.
+   Public customer lead forms can therefore submit
+   directly to FastAPI.
+   ========================================================= */
+async function submitLeadToFastAPI(
+  payload,
+  options = {}
+) {
+  if (!CONFIG.FASTAPI_BASE_URL) {
+    throw new Error(
+      "FASTAPI_BASE_URL is not configured."
+    );
+  }
+
+  if (
+    !payload ||
+    typeof payload !== "object"
+  ) {
+    throw new Error(
+      "Lead payload is required."
+    );
+  }
+
+  const body = {
+    ...payload
+  };
+
+  if (body.phone_number) {
+    body.phone_number =
+      sanitizePhone(
+        body.phone_number
+      );
+  }
+
+  if (body.phone) {
+    body.phone =
+      sanitizePhone(
+        body.phone
+      );
+  }
+
+  const headers = {
+    "Content-Type":
+      "application/json",
+    ...(options.headers || {})
+  };
+
+  /*
+   * If the dashboard has a valid session,
+   * include the access token.
+   *
+   * If there is no session, the request still
+   * proceeds as a public lead submission.
+   */
+  if (
+    state.supabase &&
+    !headers.Authorization
+  ) {
+    try {
+      const {
+        data
+      } =
+        await state.supabase.auth.getSession();
+
+      const token =
+        data?.session?.access_token;
+
+      if (token) {
+        headers.Authorization =
+          `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.warn(
+        "Could not read optional auth token:",
+        error
+      );
+    }
+  }
+
+  const response =
+    await fetch(
+      `${CONFIG.FASTAPI_BASE_URL}/api/leads`,
+      {
+        method: "POST",
+        ...options,
+        headers,
+        body: JSON.stringify(body)
+      }
+    );
+
+  const raw =
+    await response.text();
+
+  let data = null;
+
+  try {
+    data = raw
+      ? JSON.parse(raw)
+      : null;
+  } catch {
+    data = raw;
+  }
+
+  if (!response.ok) {
+    const detail =
+      typeof data === "object" &&
+      data !== null
+        ? (
+            data.detail ||
+            data.message ||
+            data.error
+          )
+        : data;
+
+    throw new Error(
+      detail ||
+        `FastAPI request failed (${response.status})`
+    );
+  }
+
+  return data;
+}
+
+/*
+ * Generic handler for any lead form.
+ *
+ * Usage:
+ *
+ * <form data-lead-form>
+ *   ...
+ * </form>
+ */
+async function handleLeadFormSubmit(event) {
+  event.preventDefault();
+
+  const form =
+    event.currentTarget ||
+    event.target;
+
+  if (!form) return;
+
+  if (
+    form.dataset.submitting ===
+    "true"
+  ) {
+    return;
+  }
+
+  form.dataset.submitting =
+    "true";
+
+  const submitButton =
+    form.querySelector(
+      'button[type="submit"]'
+    );
+
+  const originalText =
+    submitButton?.textContent;
+
+  if (submitButton) {
+    submitButton.disabled =
+      true;
+
+    submitButton.textContent =
+      "Submitting…";
+  }
+
+  try {
+    const formData =
+      new FormData(form);
+
+    const payload =
+      Object.fromEntries(
+        formData.entries()
+      );
+
+    const result =
+      await submitLeadToFastAPI(
+        payload
+      );
+
+    form.reset();
+
+    showToast(
+      "Lead captured successfully.",
+      "success"
+    );
+
+    form.dispatchEvent(
+      new CustomEvent(
+        "lead:submitted",
+        {
+          detail: result
+        }
+      )
+    );
+
+    return result;
+  } catch (error) {
+    console.error(
+      "Lead submission failed:",
+      error
+    );
+
+    showToast(
+      error.message ||
+        "Unable to submit lead.",
+      "error"
+    );
+
+    form.dispatchEvent(
+      new CustomEvent(
+        "lead:submission-error",
+        {
+          detail: error
+        }
+      )
+    );
+
+    throw error;
+  } finally {
+    form.dataset.submitting =
+      "false";
+
+    if (submitButton) {
+      submitButton.disabled =
+        false;
+
+      submitButton.textContent =
+        originalText || "Submit";
+    }
+  }
+}
+
+function wireLeadForms() {
+  document
+    .querySelectorAll(
+      "form[data-lead-form]"
+    )
+    .forEach((form) => {
+      if (
+        form.dataset.leadWired ===
+        "true"
+      ) {
+        return;
+      }
+
+      form.dataset.leadWired =
+        "true";
+
+      form.addEventListener(
+        "submit",
+        handleLeadFormSubmit
+      );
+    });
+}
+
+window.submitLeadToFastAPI =
+  submitLeadToFastAPI;
+
+window.handleLeadFormSubmit =
+  handleLeadFormSubmit;
+
+/* =========================================================
+   PROFILE SAVE
+   ========================================================= */
+async function saveProfile() {
+  if (
+    !state.supabase ||
+    !state.business?.id
+  ) {
+    showToast(
+      "Your business profile is not loaded yet.",
+      "error"
+    );
+    return;
+  }
+
+  const businessName =
+    $("#businessNameInput")
+      ?.value.trim() || "";
+
+  const ownerName =
+    $("#ownerNameInput")
+      ?.value.trim() || "";
+
+  const routingNumber =
+    sanitizePhone(
+      $("#routingNumberInput")
+        ?.value || ""
+    );
+
+  if (
+    routingNumber &&
+    !/^\+[1-9]\d{7,14}$/.test(
+      routingNumber
+    )
+  ) {
+    showToast(
+      "Use an E.164 phone number such as +2348012345678.",
+      "error"
+    );
+    return;
+  }
+
+  const patch = {};
+
+  if (businessName) {
+    patch.business_name =
+      businessName;
+  }
+
+  if (ownerName) {
+    patch.owner_name =
+      ownerName;
+  }
+
+  if (routingNumber) {
+    patch.routing_number =
+      routingNumber;
+  }
+
+  if (
+    !Object.keys(patch).length
+  ) {
+    showToast(
+      "No changes to save."
+    );
+    return;
+  }
+
+  let {
+    error
+  } =
+    await state.supabase
+      .from(CONFIG.BUSINESS_TABLE)
+      .update(patch)
+      .eq(
+        "id",
+        state.business.id
+      );
+
+  if (
+    error &&
+    /routing_number/i.test(
+      error.message || ""
+    )
+  ) {
+    delete patch.routing_number;
+
+    if (
+      Object.keys(patch).length
+    ) {
+      ({
+        error
+      } =
+        await state.supabase
+          .from(CONFIG.BUSINESS_TABLE)
+          .update(patch)
+          .eq(
+            "id",
+            state.business.id
+          ));
+    } else {
+      error = null;
+    }
+  }
+
+  if (error) {
+    showToast(
+      error.message,
+      "error"
+    );
+    return;
+  }
+
+  state.business = {
+    ...state.business,
+    ...patch
+  };
+
+  renderIdentity();
+
+  showToast(
+    "Profile saved.",
+    "success"
+  );
+}
+
+/* =========================================================
+   OPTIONAL AUTHENTICATED FASTAPI HELPER
+   ========================================================= */
+async function fetchFromFastAPI(
+  path,
+  options = {}
+) {
+  if (!CONFIG.FASTAPI_BASE_URL) {
+    throw new Error(
+      "FASTAPI_BASE_URL is not configured."
+    );
+  }
+
+  const headers = {
+    "Content-Type":
+      "application/json",
+    ...(options.headers || {})
+  };
+
+  if (
+    state.supabase &&
+    !headers.Authorization
+  ) {
+    const {
+      data
+    } =
+      await state.supabase.auth.getSession();
+
+    const token =
+      data?.session?.access_token;
+
+    if (token) {
+      headers.Authorization =
+        `Bearer ${token}`;
+    }
+  }
+
+  const response =
+    await fetch(
+      `${CONFIG.FASTAPI_BASE_URL}${path}`,
+      {
+        ...options,
+        headers
+      }
+    );
+
+  const raw =
+    await response.text();
+
+  let data = null;
+
+  try {
+    data = raw
+      ? JSON.parse(raw)
+      : null;
+  } catch {
+    data = raw;
+  }
+
+  if (!response.ok) {
+    const detail =
+      typeof data === "object" &&
+      data !== null
+        ? (
+            data.detail ||
+            data.message ||
+            data.error
+          )
+        : data;
+
+    throw new Error(
+      detail ||
+        `FastAPI request failed (${response.status})`
+    );
+  }
+
+  return data;
+}
+
+/* =========================================================
+   DERIVED METRICS
+   ========================================================= */
+function getMonthlyLeads() {
+  const start =
+    monthStartMs();
+
+  return state.leads.filter(
+    (lead) => {
+      const t =
+        new Date(
+          leadTimestamp(lead) ||
+            0
+        ).getTime();
+
+      return (
+        Number.isFinite(t) &&
+        t >= start
+      );
+    }
+  );
+}
+
+function calculateMetrics() {
+  const monthly =
+    getMonthlyLeads();
+
+  const revenue =
+    monthly.reduce(
+      (sum, lead) =>
+        sum + leadRevenue(lead),
+      0
+    );
+
+  const caught =
+    monthly.filter(
+      isCallCaught
+    ).length;
+
+  const booked =
+    monthly.filter(
+      isBooked
+    ).length;
+
+  const conversion =
+    caught > 0
+      ? Math.round(
+          (booked / caught) *
+            100
+        )
+      : 0;
+
+  return {
+    revenue,
+    caught,
+    booked,
+    conversion
+  };
+}
+
+/* =========================================================
+   RENDERING
+   ========================================================= */
+function renderIdentity() {
+  const businessName =
+    getFirst(
+      state.business,
+      [
+        "business_name",
+        "name",
+        "company_name"
+      ],
+      null
+    );
+
+  const ownerName =
+    getFirst(
+      state.business,
+      [
+        "owner_name",
+        "full_name",
+        "contact_name",
+        "admin_name"
+      ],
+      getFirst(
+        state.user?.user_metadata ||
+          {},
+        [
+          "full_name",
+          "name",
+          "display_name"
+        ],
+        null
+      )
+    );
+
+  const greeting =
+    businessName ||
+    ownerName ||
+    "Welcome back";
+
+  if ($("#greetingLine")) {
+    $("#greetingLine").textContent =
+      greetingByHour();
+  }
+
+  if ($("#businessGreeting")) {
+    $("#businessGreeting").textContent =
+      businessName ||
+      greeting;
+  }
+
+  if ($("#ownerSubline")) {
+    $("#ownerSubline").textContent =
+      ownerName
+        ? `${ownerName}, your AI recovery system is monitoring missed calls.`
+        : "Your AI recovery system is monitoring missed calls.";
+  }
+
+  if ($("#profileBusinessName")) {
+    $("#profileBusinessName").textContent =
+      businessName ||
+      "Your business";
+  }
+
+  if ($("#profileOwnerName")) {
+    $("#profileOwnerName").textContent =
+      ownerName ||
+      "Owner";
+  }
+
+  if ($("#profileAvatar")) {
+    $("#profileAvatar").textContent =
+      initials(
+        businessName ||
+          ownerName ||
+          "Recall"
+      );
+  }
+
+  if ($("#accountEmail")) {
+    $("#accountEmail").textContent =
+      safeText(
+        state.user?.email
+      );
+  }
+
+  if ($("#businessNameInput")) {
+    $("#businessNameInput").value =
+      businessName || "";
+  }
+
+  if ($("#ownerNameInput")) {
+    $("#ownerNameInput").value =
+      ownerName || "";
+  }
+
+  if ($("#routingNumberInput")) {
+    $("#routingNumberInput").value =
+      getFirst(
+        state.business,
+        [
+          "routing_number",
+          "assigned_routing_number",
+          "phone_number",
+          "inbound_number"
+        ],
+        ""
+      ) || "";
+  }
+
+  const active =
+    parseBoolean(
+      getFirst(
+        state.business,
+        [
+          "is_active",
+          "active",
+          "subscription_active"
+        ],
+        false
+      ),
+      false
+    );
+
+  if ($("#subscriptionStatus")) {
+    $("#subscriptionStatus").textContent =
+      active
+        ? "Your subscription is active"
+        : "Subscription is inactive";
+  }
+
+  if ($("#subscriptionBadge")) {
+    $("#subscriptionBadge").textContent =
+      active
+        ? "ACTIVE"
+        : "INACTIVE";
+
+    $("#subscriptionBadge").className =
+      "px-2.5 py-1.5 rounded-full text-[10px] font-extrabold border " +
+      (
+        active
+          ? "bg-emerald-400/15 text-emerald-200 border-emerald-300/20"
+          : "bg-rose-400/15 text-rose-200 border-rose-300/20"
+      );
+  }
+}
+
+function renderMetrics() {
+  const metrics =
+    calculateMetrics();
+
+  const currency =
+    getFirst(
+      state.business,
+      [
+        "currency",
+        "billing_currency"
+      ],
+      "NGN"
+    ) || "NGN";
+
+  if ($("#metricRevenue")) {
+    $("#metricRevenue").textContent =
+      formatCurrency(
+        metrics.revenue,
+        currency
+      );
+  }
+
+  if ($("#metricCalls")) {
+    $("#metricCalls").textContent =
+      metrics.caught.toLocaleString();
+  }
+
+  if ($("#metricBooked")) {
+    $("#metricBooked").textContent =
+      metrics.booked.toLocaleString();
+  }
+
+  if ($("#metricConversion")) {
+    $("#metricConversion").textContent =
+      `${metrics.conversion}%`;
+  }
+
+  if ($("#heroRevenue")) {
+    $("#heroRevenue").textContent =
+      formatCurrency(
+        metrics.revenue,
+        currency
+      );
+  }
+
+  if ($("#heroLeads")) {
+    $("#heroLeads").textContent =
+      state.leads.length.toLocaleString();
+  }
+
+  if ($("#leadCount")) {
+    $("#leadCount").textContent =
+      state.leads.length.toLocaleString();
+  }
+}
+
+function leadCardMarkup(
+  lead,
+  compact = false
+) {
+  const name =
+    leadName(lead);
+
+  const phone =
+    leadPhone(lead);
+
+  const status =
+    normalizeStatus(
+      getFirst(
+        lead,
+        [
+          "status",
+          "lead_status",
+          "outcome",
+          "stage"
+        ],
+        "Inquiry"
+      )
+    );
+
+  const styles =
+    statusClasses(status);
+
+  const note =
+    getFirst(
+      lead,
+      [
+        "summary",
+        "message",
+        "notes",
+        "last_message",
+        "inquiry"
+      ],
+      "Missed call captured. Recall is following up."
+    );
+
+  const revenue =
+    leadRevenue(lead);
+
+  const timestamp =
+    formatRelativeTime(
+      leadTimestamp(lead)
+    );
+
+  const currency =
+    getFirst(
+      state.business,
+      [
+        "currency",
+        "billing_currency"
+      ],
+      "NGN"
+    ) || "NGN";
+
+  return `
+    <article class="${
+      compact
+        ? "px-4 py-3"
+        : "p-4"
+    } bg-white">
+
+      <div class="flex items-start gap-3">
+
+        <div class="w-10 h-10 shrink-0 rounded-2xl bg-gradient-to-br from-recall-100 to-cyan-50 text-recall-950 grid place-items-center text-xs font-extrabold">
+          ${escapeHtml(
+            initials(name)
+          )}
+        </div>
+
+        <div class="min-w-0 flex-1">
+
+          <div class="flex items-start justify-between gap-3">
+
+            <div class="min-w-0">
+
+              <p class="text-sm font-extrabold truncate">
+                ${escapeHtml(name)}
+              </p>
+
+              <p class="mt-0.5 text-[11px] text-slate-400 truncate">
+                ${escapeHtml(phone)}
+              </p>
+
+            </div>
+
+            <span class="shrink-0 inline-flex items-center gap-1.5 ${
+              styles.bg
+            } ${
+              styles.text
+            } rounded-full px-2 py-1 text-[10px] font-extrabold">
+
+              <span class="status-dot ${
+                styles.dot
+              }"></span>
+
+              ${escapeHtml(status)}
+
+            </span>
+
+          </div>
+
+          ${
+            compact
+              ? ""
+              : `
+                <p class="mt-3 text-xs text-slate-500 leading-relaxed">
+                  ${escapeHtml(note)}
+                </p>
+              `
+          }
+
+          <div class="mt-3 flex items-center justify-between gap-3">
+
+            <span class="text-[10px] font-semibold text-slate-400">
+              ${escapeHtml(timestamp)}
+            </span>
+
+            <span class="text-[10px] font-extrabold ${
+              revenue > 0
+                ? "text-emerald-600"
+                : "text-slate-400"
+            }">
+
+              ${
+                revenue > 0
+                  ? "+" +
+                    formatCurrency(
+                      revenue,
+                      currency
+                    )
+                  : "No revenue yet"
+              }
+
+            </span>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </article>
+  `;
+}
+
+function renderHomeLeadFeed() {
+  const container =
+    $("#homeLeadFeed");
+
+  if (!container) return;
+
+  const leads =
+    state.leads.slice(0, 5);
+
+  if (!leads.length) {
+    container.innerHTML = `
+      <div class="p-6 text-center">
+
+        <div class="w-12 h-12 rounded-2xl bg-recall-100 text-recall-950 mx-auto grid place-items-center font-extrabold">
+          0
+        </div>
+
+        <p class="mt-3 text-sm font-bold">
+          No recovered leads yet
+        </p>
+
+        <p class="mt-1 text-xs text-slate-400">
+          Your live recovery feed will appear here.
+        </p>
+
+      </div>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    leads
+      .map((lead) =>
+        leadCardMarkup(
+          lead,
+          true
+        )
+      )
+      .join("");
+}
+
+function renderLeads() {
+  const filter =
+    state.activeLeadFilter;
+
+  const filtered =
+    state.leads.filter(
+      (lead) =>
+        filter === "all" ||
+        normalizeStatus(
+          getFirst(
+            lead,
+            [
+              "status",
+              "lead_status",
+              "outcome",
+              "stage"
+            ],
+            "Inquiry"
+          )
+        ) === filter
+    );
+
+  const container =
+    $("#leadsList");
+
+  if (!container) return;
+
+  if (!filtered.length) {
+    container.innerHTML = `
+      <div class="card rounded-3xl bg-white p-7 text-center">
+
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 grid place-items-center text-slate-500">
+          —
+        </div>
+
+        <p class="mt-3 text-sm font-bold">
+          No ${
+            filter === "all"
+              ? ""
+              : filter.toLowerCase() + " "
+          }leads
+        </p>
+
+        <p class="mt-1 text-xs text-slate-400">
+          New recovery activity will appear here automatically.
+        </p>
+
+      </div>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    filtered
+      .map(
+        (lead) =>
+          `
+            <div class="card rounded-3xl overflow-hidden">
+              ${leadCardMarkup(
+                lead,
+                false
+              )}
+            </div>
+          `
+      )
+      .join("");
+}
+
+function renderAll() {
+  renderIdentity();
+  renderMetrics();
+  renderHomeLeadFeed();
+  renderLeads();
+}
+
+function renderErrorState(
+  error
+) {
+  const message =
+    safeText(
+      error?.message,
+      "Data could not be loaded."
+    );
+
+  const feed =
+    $("#homeLeadFeed");
+
+  if (!feed) return;
+
+  feed.innerHTML = `
+    <div class="p-6">
+
+      <p class="text-sm font-extrabold text-rose-600">
+        Could not load live data
+      </p>
+
+      <p class="mt-1 text-xs text-slate-500 leading-relaxed">
+        ${escapeHtml(message)}
+      </p>
+
+      <button
+        id="retryButton"
+        class="mt-4 rounded-xl bg-slate-950 text-white px-3.5 py-2.5 text-xs font-bold"
+      >
+        Retry
+      </button>
+
+    </div>
+  `;
+
+  $("#retryButton")?.addEventListener(
+    "click",
+    () => bootstrapData()
+  );
+}
+
+/* =========================================================
+   NAVIGATION
+   ========================================================= */
+function switchView(view) {
+  state.activeView =
+    view;
+
+  $$(".view").forEach(
+    (section) => {
+      section.classList.toggle(
+        "hidden",
+        section.dataset.view !==
+          view
+      );
+    }
+  );
+
+  $$(".nav-pill").forEach(
+    (button) => {
+      button.classList.toggle(
+        "active",
+        button.dataset.viewBtn ===
+          view
+      );
+    }
+  );
+
+  const titles = {
+    home: "Dashboard",
+    leads: "Lead activity",
+    profile: "Profile"
+  };
+
+  if ($("#pageTitle")) {
+    $("#pageTitle").textContent =
+      titles[view] ||
+      "Recall";
+  }
+
+  if ($("#mainView")) {
+    $("#mainView").scrollTop =
+      0;
+  }
+}
+
+/* =========================================================
+   HTML ESCAPING
+   ========================================================= */
+function escapeHtml(input) {
+  return String(input ?? "")
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
+}
+
+/* =========================================================
+   EVENT WIRING
+   ========================================================= */
+function wireEvents() {
+  $$("[data-view-btn]")
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        () =>
+          switchView(
+            button.dataset.viewBtn
+          )
+      );
+    });
+
+  $$("[data-go]")
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        () =>
+          switchView(
+            button.dataset.go
+          )
+      );
+    });
+
+  $$(".filter-button")
+    .forEach((button) => {
+      button.addEventListener(
+        "click",
+        () => {
+          state.activeLeadFilter =
+            button.dataset.filter;
+
+          $$(".filter-button")
+            .forEach((btn) => {
+              const active =
+                btn.dataset.filter ===
+                state.activeLeadFilter;
+
+              btn.classList.toggle(
+                "active",
+                active
+              );
+
+              btn.classList.toggle(
+                "bg-recall-950",
+                active
+              );
+
+              btn.classList.toggle(
+                "text-white",
+                active
+              );
+
+              btn.classList.toggle(
+                "bg-slate-100",
+                !active
+              );
+
+              btn.classList.toggle(
+                "text-slate-600",
+                !active
+              );
+            });
+
+          renderLeads();
+        }
+      );
+    });
+
+  $("#refreshButton")
+    ?.addEventListener(
+      "click",
+      async () => {
+        if (
+          state.supabase &&
+          state.user
+        ) {
+          await bootstrapData();
+        } else {
+          showToast(
+            "Sign in to refresh your data.",
+            "error"
+          );
+        }
+      }
+    );
+
+  $("#saveProfileButton")
+    ?.addEventListener(
+      "click",
+      saveProfile
+    );
+
+  $("#signOutButton")
+    ?.addEventListener(
+      "click",
+      signOut
+    );
+
+  $("#authSignInTab")
+    ?.addEventListener(
+      "click",
+      () =>
+        setAuthMode(
+          "signin"
+        )
+    );
+
+  $("#authSignUpTab")
+    ?.addEventListener(
+      "click",
+      () =>
+        setAuthMode(
+          "signup"
+        )
+    );
+
+  $("#signInForm")
+    ?.addEventListener(
+      "submit",
+      handleSignIn
+    );
+
+  $("#signUpForm")
+    ?.addEventListener(
+      "submit",
+      handleSignUp
+    );
+
+  $("#forgotPasswordButton")
+    ?.addEventListener(
+      "click",
+      handleForgotPassword
+    );
+
+  wireLeadForms();
+}
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+(function boot() {
+  wireEvents();
+  switchView("home");
+  setAuthMode("signin");
+  initSupabase();
+})();
+</script>
 </body>
 </html>
