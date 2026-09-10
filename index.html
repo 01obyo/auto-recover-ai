@@ -56,13 +56,6 @@
     };
   </script>
   
-  <script>
-  const CONFIG = {
-    SUPABASE_URL: "https://qyfxijdzayvaietjonzw.supabase.co",
-    SUPABASE_ANON_KEY: "sb_publishable_7alITN25Zpj99xS8QFf2Tw_kLHC5j70"
-  };
-  </script>
-  
   <!-- Supabase browser client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -780,7 +773,7 @@
       $("#refreshButton").classList.toggle("opacity-60", isLoading);
     }
 
-        function showAuthScreen() {
+    function showAuthScreen() {
       $("#authScreen").classList.remove("hidden-view");
       $("#authScreen").classList.remove("hidden");
     }
@@ -942,20 +935,20 @@
        SUPABASE / SESSION
        ========================================================= */
     function initSupabase() {
-  const hasConfig = Boolean(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
+      const hasConfig = Boolean(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
 
-  if (!hasConfig || !window.supabase?.createClient) {
-    console.error("Recall: Supabase configuration/client is missing.");
-    showAuthScreen();
-    showAuthMessage("Supabase is not configured correctly. Check your project URL and publishable key.", "error", "#signInMessage");
-    return false;
-  }
+      if (!hasConfig || !window.supabase?.createClient) {
+        console.error("Recall: Supabase configuration/client is missing.");
+        showAuthScreen();
+        showAuthMessage("Supabase is not configured correctly. Check your project URL and publishable key.", "error", "#signInMessage");
+        return false;
+      }
 
-  state.supabase = window.supabase.createClient(
-    CONFIG.SUPABASE_URL,
-    CONFIG.SUPABASE_ANON_KEY,
-    { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
-  );
+      state.supabase = window.supabase.createClient(
+        CONFIG.SUPABASE_URL,
+        CONFIG.SUPABASE_ANON_KEY,
+        { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
+      );
       
       state.supabase.auth.onAuthStateChange(async (_event, session) => {
         const nextUser = session?.user || null;
