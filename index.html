@@ -938,8 +938,8 @@
       const hasConfig =
         CONFIG.SUPABASE_URL &&
         CONFIG.SUPABASE_ANON_KEY &&
-        !CONFIG.SUPABASE_URL.includes("YOUR_PROJECT") &&
-        !CONFIG.SUPABASE_ANON_KEY.includes("YOUR_SUPABASE_ANON_KEY");
+        !CONFIG.SUPABASE_URL.includes("https://qyfxijdzayvaietjonzw.supabase.co") &&
+        !CONFIG.SUPABASE_ANON_KEY.includes("sb_publishable_7alITN25Zpj99xS8QFf2Tw_kLHC5j70");
 
       if (!hasConfig || !window.supabase?.createClient) {
         console.error("Recall: Supabase configuration/client is missing.");
