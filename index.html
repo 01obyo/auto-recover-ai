@@ -2,704 +2,1232 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#f8fafc" />
-  <title>Recall AI — Dashboard</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  <meta name="theme-color" content="#03045e" />
+  <meta name="description" content="Recall — autonomous AI missed-call recovery and booking dashboard" />
+  <title>Recall — Missed-call recovery</title>
 
+  <!-- Tailwind CSS CDN: this single-file build needs no bundler. -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: {
-            sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"]
+          colors: {
+            recall: {
+              950: "#03045E",
+              900: "#052A72",
+              800: "#0077B6",
+              700: "#0096C7",
+              600: "#00B4D8",
+              500: "#48CAE4",
+              300: "#90E0EF",
+              100: "#CAF0F8",
+            }
+          },
+          boxShadow: {
+            glow: "0 20px 60px rgba(0, 180, 216, .20)",
+            soft: "0 12px 40px rgba(3, 4, 94, .10)"
+          },
+          animation: {
+            float: "float 6s ease-in-out infinite",
+            pulseSoft: "pulseSoft 2.2s ease-in-out infinite",
+            shimmer: "shimmer 1.8s linear infinite"
+          },
+          keyframes: {
+            float: {
+              "0%,100%": { transform: "translateY(0px)" },
+              "50%": { transform: "translateY(-8px)" }
+            },
+            pulseSoft: {
+              "0%,100%": { opacity: ".65" },
+              "50%": { opacity: "1" }
+            },
+            shimmer: {
+              "0%": { transform: "translateX(-120%)" },
+              "100%": { transform: "translateX(220%)" }
+            }
           }
         }
       }
     };
   </script>
 
+  <!-- Supabase browser client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
-    * {
-      box-sizing: border-box;
+    :root {
+      color-scheme: light;
+      --ink: #07122e;
+      --muted: #71809f;
+      --line: #e7edf7;
+      --surface: #ffffff;
+      --soft: #f5f8fd;
+      --brand: #00b4d8;
+      --brand-dark: #03045e;
+    }
+
+    * { -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      min-height: 100%;
+      background: #f5f8fd;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
     }
 
     body {
       margin: 0;
-      background: #f8fafc;
-      color: #0f172a;
-      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      overscroll-behavior-y: none;
     }
 
-    .hidden-view {
-      display: none !important;
+    button, input {
+      font: inherit;
     }
 
-    .nav-active {
-      background: #0f172a !important;
-      color: white !important;
+    .safe-bottom {
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
     }
 
-    .toast-show {
-      display: block !important;
-      animation: toastIn .2s ease-out;
+    .glass {
+      background: rgba(255,255,255,.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
     }
 
-    @keyframes toastIn {
-      from {
-        opacity: 0;
-        transform: translate(-50%, 10px);
-      }
-      to {
-        opacity: 1;
-        transform: translate(-50%, 0);
-      }
+    .mesh-bg {
+      background:
+        radial-gradient(circle at 0% 0%, rgba(144,224,239,.70), transparent 38%),
+        radial-gradient(circle at 100% 20%, rgba(72,202,228,.34), transparent 32%),
+        linear-gradient(180deg, #eefbff 0%, #f6f9fd 44%, #f5f8fd 100%);
     }
 
-    .spinner {
-      width: 18px;
-      height: 18px;
-      border: 2px solid #cbd5e1;
-      border-top-color: #0f172a;
+    .dark-hero {
+      background:
+        radial-gradient(circle at 92% 2%, rgba(0,180,216,.38), transparent 28%),
+        radial-gradient(circle at 7% 98%, rgba(72,202,228,.18), transparent 26%),
+        linear-gradient(135deg, #03045e 0%, #052a72 47%, #0077b6 100%);
+    }
+
+    .card {
+      border: 1px solid rgba(231,237,247,.95);
+      box-shadow: 0 12px 34px rgba(3, 4, 94, .06);
+    }
+
+    .thin-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+    .thin-scrollbar::-webkit-scrollbar-thumb {
+      background: #c9d5e8;
       border-radius: 999px;
-      animation: spin .7s linear infinite;
     }
 
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
+    .nav-pill.active {
+      background: #03045e;
+      color: #fff;
+      box-shadow: 0 8px 22px rgba(3, 4, 94, .20);
+    }
+
+    .nav-pill.active .nav-icon {
+      background: rgba(255,255,255,.13);
+    }
+
+    .input {
+      border: 1px solid #dfe7f2;
+      background: #fff;
+      outline: none;
+      transition: .18s ease;
+    }
+
+    .input:focus {
+      border-color: #48cae4;
+      box-shadow: 0 0 0 4px rgba(72,202,228,.13);
+    }
+
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 999px;
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+
+    .skeleton {
+      position: relative;
+      overflow: hidden;
+      background: #e8eef6;
+    }
+
+    .skeleton::after {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 -45%;
+      width: 40%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent);
+      animation: shimmer 1.8s linear infinite;
+    }
+
+    .metric-value {
+      letter-spacing: -0.04em;
+    }
+
+    @media (min-width: 900px) {
+      body { display: grid; place-items: center; padding: 26px; }
+      #app-shell {
+        width: min(440px, 100%);
+        min-height: 880px;
+        max-height: calc(100vh - 52px);
+        border-radius: 34px;
+        overflow: hidden;
+        box-shadow: 0 24px 90px rgba(3,4,94,.18);
+        border: 1px solid rgba(255,255,255,.9);
       }
     }
   </style>
 </head>
 
 <body>
-
-  <!-- =========================================================
-       AUTH SCREEN
-       ========================================================= -->
-
-  <section id="authScreen" class="min-h-screen flex items-center justify-center px-5 py-10">
-    <div class="w-full max-w-md">
-
-      <div class="mb-8 text-center">
-        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-xl font-black text-white">
-          R
-        </div>
-
-        <h1 class="text-3xl font-black tracking-tight">
-          Recall AI
-        </h1>
-
-        <p class="mt-2 text-sm text-slate-500">
-          Recover missed leads automatically.
-        </p>
-      </div>
-
-      <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-
-        <div class="mb-6 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
-          <button
-            id="signInTab"
-            type="button"
-            class="rounded-lg bg-white px-4 py-2.5 text-sm font-bold shadow-sm"
-          >
-            Sign in
-          </button>
-
-          <button
-            id="signUpTab"
-            type="button"
-            class="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500"
-          >
-            Create account
-          </button>
-        </div>
-
-        <form id="authForm" class="space-y-4">
-
-          <div id="nameField" class="hidden">
-            <label class="mb-1.5 block text-xs font-bold text-slate-600">
-              Business name
-            </label>
-
-            <input
-              id="authBusinessName"
-              type="text"
-              autocomplete="organization"
-              class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
-              placeholder="Your business"
-            />
+  <div id="app-shell" class="relative min-h-screen mesh-bg flex flex-col">
+    <!-- =========================
+         APP HEADER
+         ========================= -->
+    <header class="px-5 pt-5 pb-3 shrink-0">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl dark-hero grid place-items-center text-white shadow-glow">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M7 4.8C7 3.806 7.806 3 8.8 3h1.3a1 1 0 0 1 .94.658l1.07 3.018a1 1 0 0 1-.32 1.094l-1.37 1.14a12.6 12.6 0 0 0 4.67 4.67l1.14-1.37a1 1 0 0 1 1.094-.32l3.018 1.07a1 1 0 0 1 .658.94v1.3A1.8 1.8 0 0 1 19.2 17c-6.738 0-12.2-5.462-12.2-12.2Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16.6 3.8a4.6 4.6 0 0 1 3.6 3.6M16.6 6.1a2.3 2.3 0 0 1 1.3 1.3" stroke="#90E0EF" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
           </div>
-
           <div>
-            <label class="mb-1.5 block text-xs font-bold text-slate-600">
-              Email
-            </label>
-
-            <input
-              id="authEmail"
-              type="email"
-              autocomplete="email"
-              required
-              class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
-              placeholder="you@example.com"
-            />
+            <p class="text-[11px] uppercase tracking-[0.19em] font-bold text-recall-800">Recall</p>
+            <h1 id="pageTitle" class="text-lg font-bold tracking-tight">Dashboard</h1>
           </div>
-
-          <div>
-            <label class="mb-1.5 block text-xs font-bold text-slate-600">
-              Password
-            </label>
-
-            <input
-              id="authPassword"
-              type="password"
-              autocomplete="current-password"
-              required
-              minlength="6"
-              class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
-              placeholder="••••••••"
-            />
-          </div>
-
-          <button
-            id="authSubmit"
-            type="submit"
-            class="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800"
-          >
-            Sign in
-          </button>
-        </form>
-
-        <button
-          id="forgotPassword"
-          type="button"
-          class="mt-4 w-full text-center text-xs font-bold text-slate-500 hover:text-slate-900"
-        >
-          Forgot password?
-        </button>
-
-        <p id="authMessage" class="mt-4 hidden rounded-xl bg-slate-100 p-3 text-xs font-semibold text-slate-700"></p>
-
-      </div>
-    </div>
-  </section>
-
-
-  <!-- =========================================================
-       MAIN APP
-       ========================================================= -->
-
-  <div id="app" class="hidden min-h-screen">
-
-    <!-- SIDEBAR / TOP NAV -->
-
-    <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-
-        <button
-          id="brandButton"
-          type="button"
-          class="flex items-center gap-3"
-        >
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950 text-sm font-black text-white">
-            R
-          </div>
-
-          <div class="text-left">
-            <div class="text-sm font-black">
-              Recall AI
-            </div>
-            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Lead recovery
-            </div>
-          </div>
-        </button>
-
-        <div class="flex items-center gap-2">
-          <span
-            id="connectionStatus"
-            class="hidden rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-black text-emerald-700 sm:inline-flex"
-          >
-            Connected
-          </span>
-
-          <button
-            id="signOutButton"
-            type="button"
-            class="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
-          >
-            Sign out
-          </button>
         </div>
+
+        <button id="refreshButton" class="w-10 h-10 rounded-2xl bg-white border border-slate-200 grid place-items-center shadow-soft" title="Refresh data" aria-label="Refresh data">
+          <svg id="refreshIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20 11a8.1 8.1 0 0 0-14.8-3.8L4 9m0 0V5m0 4h4M4 13a8.1 8.1 0 0 0 14.8 3.8L20 15m0 0v4m0-4h-4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     </header>
 
+    <!-- =========================
+         MAIN VIEW CONTAINER
+         ========================= -->
+    <main id="mainView" class="flex-1 overflow-y-auto thin-scrollbar px-5 pb-28">
+      <!-- HOME VIEW -->
+      <section data-view="home" class="view space-y-4">
+        <div class="dark-hero rounded-[28px] p-5 text-white shadow-glow overflow-hidden relative">
+          <div class="absolute -right-10 -top-10 w-40 h-40 rounded-full border border-white/10"></div>
+          <div class="absolute -right-20 -top-2 w-44 h-44 rounded-full border border-white/5"></div>
 
-    <main class="mx-auto flex max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:py-8">
-
-      <!-- NAV -->
-
-      <aside class="hidden w-56 shrink-0 md:block">
-        <nav class="sticky top-24 space-y-1">
-
-          <button
-            data-view="home"
-            type="button"
-            class="nav-button nav-active flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-bold"
-          >
-            Overview
-          </button>
-
-          <button
-            data-view="leads"
-            type="button"
-            class="nav-button flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-bold text-slate-500 hover:bg-slate-100"
-          >
-            Leads
-          </button>
-
-          <button
-            data-view="profile"
-            type="button"
-            class="nav-button flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-bold text-slate-500 hover:bg-slate-100"
-          >
-            Business profile
-          </button>
-
-        </nav>
-      </aside>
-
-
-      <!-- CONTENT -->
-
-      <section class="min-w-0 flex-1">
-
-        <!-- HOME -->
-
-        <div id="homeView" class="view">
-
-          <div class="mb-8">
-            <p class="text-xs font-black uppercase tracking-widest text-slate-400">
-              Dashboard
-            </p>
-
-            <h2
-              id="welcomeTitle"
-              class="mt-1 text-3xl font-black tracking-tight sm:text-4xl"
-            >
-              Overview
-            </h2>
-
-            <p class="mt-2 text-sm text-slate-500">
-              Monitor leads and recovered opportunities.
-            </p>
-          </div>
-
-
-          <!-- METRICS -->
-
-          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-            <div class="rounded-2xl border border-slate-200 bg-white p-5">
-              <p class="text-xs font-bold text-slate-500">
-                Total leads
-              </p>
-
-              <p id="metricTotal" class="mt-2 text-3xl font-black">
-                0
-              </p>
-            </div>
-
-            <div class="rounded-2xl border border-slate-200 bg-white p-5">
-              <p class="text-xs font-bold text-slate-500">
-                New inquiries
-              </p>
-
-              <p id="metricInquiry" class="mt-2 text-3xl font-black">
-                0
-              </p>
-            </div>
-
-            <div class="rounded-2xl border border-slate-200 bg-white p-5">
-              <p class="text-xs font-bold text-slate-500">
-                Pending
-              </p>
-
-              <p id="metricPending" class="mt-2 text-3xl font-black">
-                0
-              </p>
-            </div>
-
-            <div class="rounded-2xl border border-slate-200 bg-white p-5">
-              <p class="text-xs font-bold text-slate-500">
-                Booked
-              </p>
-
-              <p id="metricBooked" class="mt-2 text-3xl font-black">
-                0
-              </p>
-            </div>
-
-          </div>
-
-
-          <!-- LEAD FEED -->
-
-          <div class="mt-6 rounded-2xl border border-slate-200 bg-white">
-
-            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div class="relative z-10">
+            <p id="greetingLine" class="text-sm text-white/72">Good afternoon</p>
+            <div class="mt-1 flex items-start justify-between gap-4">
               <div>
-                <h3 class="text-sm font-black">
-                  Recent leads
-                </h3>
-
-                <p class="mt-1 text-xs text-slate-400">
-                  Latest activity from your lead pipeline.
+                <h2 id="businessGreeting" class="text-[25px] leading-tight font-extrabold tracking-[-0.03em]">
+                  Welcome back
+                </h2>
+                <p id="ownerSubline" class="mt-2 text-xs leading-relaxed text-white/65 max-w-[250px]">
+                  Your AI recovery system is monitoring missed calls.
                 </p>
               </div>
-
-              <button
-                id="homeViewLeads"
-                type="button"
-                class="text-xs font-black text-slate-600 hover:text-slate-950"
-              >
-                View all
-              </button>
-            </div>
-
-            <div id="homeLeadFeed" class="divide-y divide-slate-100">
-              <div class="p-6 text-center text-sm text-slate-400">
-                Loading leads...
+              <div class="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/10">
+                <span class="status-dot bg-emerald-300 animate-pulseSoft"></span>
+                <span class="text-[11px] font-semibold">Live</span>
               </div>
             </div>
 
+            <div class="mt-5 grid grid-cols-2 gap-2">
+              <div class="rounded-2xl bg-white/8 border border-white/10 p-3">
+                <p class="text-[10px] uppercase tracking-wider text-white/50">Recovery this month</p>
+                <p id="heroRevenue" class="mt-1 text-[20px] font-extrabold">$0</p>
+              </div>
+              <div class="rounded-2xl bg-white/8 border border-white/10 p-3">
+                <p class="text-[10px] uppercase tracking-wider text-white/50">Live leads</p>
+                <p id="heroLeads" class="mt-1 text-[20px] font-extrabold">0</p>
+              </div>
+            </div>
           </div>
-
         </div>
 
+        <!-- METRICS -->
+        <div class="grid grid-cols-2 gap-3">
+          <article class="card rounded-3xl bg-white p-4">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-recall-100 text-recall-950 grid place-items-center">
+                <span class="text-base font-bold">₦</span>
+              </div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Recovered</span>
+            </div>
+            <p class="metric-value mt-3 text-[24px] font-extrabold" id="metricRevenue">₦0</p>
+            <p class="mt-1 text-xs text-slate-400">Revenue recovered</p>
+          </article>
 
-        <!-- LEADS -->
+          <article class="card rounded-3xl bg-white p-4">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-cyan-50 text-recall-800 grid place-items-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 15.5v1.6a2 2 0 0 1-2.2 2A17.4 17.4 0 0 1 3 3.2 2 2 0 0 1 5 1h1.6a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L7.7 8.7a14 14 0 0 0 7.6 7.6l1.1-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7A2 2 0 0 1 21 15.5Z" stroke="currentColor" stroke-width="1.7"/></svg>
+              </div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Calls</span>
+            </div>
+            <p class="metric-value mt-3 text-[24px] font-extrabold" id="metricCalls">0</p>
+            <p class="mt-1 text-xs text-slate-400">Caught by Recall</p>
+          </article>
 
-        <div id="leadsView" class="view hidden-view">
+          <article class="card rounded-3xl bg-white p-4">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 grid place-items-center">
+                <span class="text-base font-extrabold">✓</span>
+              </div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Booked</span>
+            </div>
+            <p class="metric-value mt-3 text-[24px] font-extrabold" id="metricBooked">0</p>
+            <p class="mt-1 text-xs text-slate-400">Appointments won</p>
+          </article>
 
-          <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <article class="card rounded-3xl bg-white p-4">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 grid place-items-center">
+                <span class="text-base font-extrabold">%</span>
+              </div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rate</span>
+            </div>
+            <p class="metric-value mt-3 text-[24px] font-extrabold" id="metricConversion">0%</p>
+            <p class="mt-1 text-xs text-slate-400">Call → booking</p>
+          </article>
+        </div>
+
+        <!-- LIVE LEAD FEED -->
+        <section class="card rounded-3xl bg-white overflow-hidden">
+          <div class="px-4 py-4 flex items-center justify-between border-b border-slate-100">
             <div>
-              <p class="text-xs font-black uppercase tracking-widest text-slate-400">
-                Pipeline
-              </p>
-
-              <h2 class="mt-1 text-3xl font-black tracking-tight">
-                Leads
-              </h2>
-
-              <p class="mt-2 text-sm text-slate-500">
-                Review and manage incoming leads.
-              </p>
+              <h3 class="font-bold">Live recovery feed</h3>
+              <p class="text-[11px] text-slate-400 mt-0.5">Recent missed calls and AI outcomes</p>
             </div>
-
-            <button
-              id="refreshLeads"
-              type="button"
-              class="rounded-xl bg-slate-950 px-4 py-3 text-xs font-black text-white"
-            >
-              Refresh
+            <button data-go="leads" class="text-xs font-bold text-recall-800 hover:text-recall-950">
+              View all
             </button>
           </div>
+          <div id="homeLeadFeed" class="divide-y divide-slate-100"></div>
+        </section>
 
-          <div class="mb-5 grid gap-3 sm:grid-cols-3">
-
-            <button
-              data-filter="all"
-              type="button"
-              class="lead-filter rounded-xl border border-slate-200 bg-white px-4 py-3 text-left"
-            >
-              <span class="block text-xs font-bold text-slate-400">
-                All
-              </span>
-              <span id="filterAllCount" class="mt-1 block text-xl font-black">
-                0
-              </span>
-            </button>
-
-            <button
-              data-filter="pending"
-              type="button"
-              class="lead-filter rounded-xl border border-slate-200 bg-white px-4 py-3 text-left"
-            >
-              <span class="block text-xs font-bold text-slate-400">
-                Pending
-              </span>
-              <span id="filterPendingCount" class="mt-1 block text-xl font-black">
-                0
-              </span>
-            </button>
-
-            <button
-              data-filter="booked"
-              type="button"
-              class="lead-filter rounded-xl border border-slate-200 bg-white px-4 py-3 text-left"
-            >
-              <span class="block text-xs font-bold text-slate-400">
-                Booked
-              </span>
-              <span id="filterBookedCount" class="mt-1 block text-xl font-black">
-                0
-              </span>
-            </button>
-
+        <!-- SYSTEM HEALTH -->
+        <section class="rounded-3xl p-4 bg-slate-950 text-white shadow-soft">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs text-white/45">Recovery system</p>
+              <p class="mt-0.5 font-bold">Autonomous mode</p>
+            </div>
+            <div class="flex items-center gap-1.5 text-[11px] font-bold text-emerald-300">
+              <span class="status-dot bg-emerald-300"></span> Operational
+            </div>
           </div>
+          <div class="mt-4 grid grid-cols-3 gap-2">
+            <div class="rounded-2xl bg-white/5 p-3">
+              <p class="text-[10px] text-white/40">Listening</p>
+              <p class="mt-1 text-sm font-bold">24/7</p>
+            </div>
+            <div class="rounded-2xl bg-white/5 p-3">
+              <p class="text-[10px] text-white/40">Follow-ups</p>
+              <p class="mt-1 text-sm font-bold">AI</p>
+            </div>
+            <div class="rounded-2xl bg-white/5 p-3">
+              <p class="text-[10px] text-white/40">Mode</p>
+              <p class="mt-1 text-sm font-bold">Auto</p>
+            </div>
+          </div>
+        </section>
+      </section>
 
-          <div class="rounded-2xl border border-slate-200 bg-white">
-            <div id="leadList" class="divide-y divide-slate-100">
-              <div class="p-8 text-center text-sm text-slate-400">
-                Loading leads...
-              </div>
+      <!-- LEADS VIEW -->
+      <section data-view="leads" class="view hidden space-y-4">
+        <div class="rounded-3xl bg-white border border-slate-200 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="text-xl font-extrabold tracking-tight">Leads</h2>
+              <p class="mt-1 text-xs text-slate-400">Every recovery opportunity in one place.</p>
+            </div>
+            <div class="px-2.5 py-1.5 rounded-full bg-recall-100 text-recall-950 text-[10px] font-extrabold">
+              <span id="leadCount">0</span> total
             </div>
           </div>
 
+          <div class="mt-4 flex gap-2 overflow-x-auto pb-1 thin-scrollbar">
+            <button class="filter-button active shrink-0 px-3 py-2 rounded-xl bg-recall-950 text-white text-xs font-bold" data-filter="all">All</button>
+            <button class="filter-button shrink-0 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold" data-filter="Booked">Booked</button>
+            <button class="filter-button shrink-0 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold" data-filter="Pending">Pending</button>
+            <button class="filter-button shrink-0 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold" data-filter="Inquiry">Inquiry</button>
+          </div>
         </div>
 
+        <div id="leadsList" class="space-y-3"></div>
+      </section>
 
-        <!-- PROFILE -->
-
-        <div id="profileView" class="view hidden-view">
-
-          <div class="mb-8">
-            <p class="text-xs font-black uppercase tracking-widest text-slate-400">
-              Settings
-            </p>
-
-            <h2 class="mt-1 text-3xl font-black tracking-tight">
-              Business profile
-            </h2>
-
-            <p class="mt-2 text-sm text-slate-500">
-              Configure the information Recall uses for your business.
-            </p>
+      <!-- PROFILE VIEW -->
+      <section data-view="profile" class="view hidden space-y-4">
+        <div class="dark-hero rounded-3xl p-5 text-white shadow-glow">
+          <div class="flex items-center gap-3">
+            <div id="profileAvatar" class="w-12 h-12 rounded-2xl bg-white/12 border border-white/10 grid place-items-center font-extrabold text-lg">R</div>
+            <div class="min-w-0">
+              <p id="profileBusinessName" class="font-extrabold truncate">Your business</p>
+              <p id="profileOwnerName" class="text-xs text-white/55 truncate">Owner</p>
+            </div>
           </div>
-
-
-          <form
-            id="profileForm"
-            class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"
-          >
-
-            <div class="grid gap-5 sm:grid-cols-2">
-
-              <div class="sm:col-span-2">
-                <label class="mb-1.5 block text-xs font-bold text-slate-600">
-                  Business name
-                </label>
-
-                <input
-                  id="profileBusinessName"
-                  type="text"
-                  class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slate-500"
-                  placeholder="Your business"
-                />
-              </div>
-
-              <div>
-                <label class="mb-1.5 block text-xs font-bold text-slate-600">
-                  Email
-                </label>
-
-                <input
-                  id="profileEmail"
-                  type="email"
-                  class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slate-500"
-                  placeholder="business@example.com"
-                />
-              </div>
-
-              <div>
-                <label class="mb-1.5 block text-xs font-bold text-slate-600">
-                  Phone
-                </label>
-
-                <input
-                  id="profilePhone"
-                  type="tel"
-                  class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slate-500"
-                  placeholder="+234..."
-                />
-              </div>
-
-              <div>
-                <label class="mb-1.5 block text-xs font-bold text-slate-600">
-                  Website
-                </label>
-
-                <input
-                  id="profileWebsite"
-                  type="url"
-                  class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slate-500"
-                  placeholder="https://..."
-                />
-              </div>
-
-              <div>
-                <label class="mb-1.5 block text-xs font-bold text-slate-600">
-                  Routing number
-                </label>
-
-                <input
-                  id="profileRoutingNumber"
-                  type="text"
-                  class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slate-500"
-                  placeholder="Optional"
-                />
-              </div>
-
-              <div class="sm:col-span-2">
-                <label class="mb-1.5 block text-xs font-bold text-slate-600">
-                  Business description
-                </label>
-
-                <textarea
-                  id="profileDescription"
-                  rows="5"
-                  class="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slate-500"
-                  placeholder="Tell Recall about your business..."
-                ></textarea>
-              </div>
-
+          <div class="mt-5 flex items-center justify-between">
+            <div>
+              <p class="text-[10px] text-white/45 uppercase tracking-wider">Subscription</p>
+              <p id="subscriptionStatus" class="mt-1 text-sm font-bold">Checking…</p>
             </div>
-
-            <div class="mt-6 flex justify-end">
-              <button
-                id="saveProfile"
-                type="submit"
-                class="rounded-xl bg-slate-950 px-5 py-3 text-xs font-black text-white"
-              >
-                Save changes
-              </button>
-            </div>
-
-          </form>
-
+            <span id="subscriptionBadge" class="px-2.5 py-1.5 rounded-full text-[10px] font-extrabold bg-white/10 border border-white/10">—</span>
+          </div>
         </div>
 
+        <section class="card rounded-3xl bg-white p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="font-bold">Business profile</h3>
+              <p class="text-[11px] text-slate-400 mt-0.5">Pulled from Supabase in real time.</p>
+            </div>
+            <span class="text-[10px] font-bold text-recall-800 bg-recall-100 px-2 py-1 rounded-full">LIVE</span>
+          </div>
+
+          <div class="mt-4 space-y-3">
+            <label class="block">
+              <span class="text-[11px] font-bold text-slate-500">Business name</span>
+              <input id="businessNameInput" class="input mt-1.5 w-full rounded-2xl px-3.5 py-3 text-sm" type="text" />
+            </label>
+            <label class="block">
+              <span class="text-[11px] font-bold text-slate-500">Owner name</span>
+              <input id="ownerNameInput" class="input mt-1.5 w-full rounded-2xl px-3.5 py-3 text-sm" type="text" />
+            </label>
+            <label class="block">
+              <span class="text-[11px] font-bold text-slate-500">Routing number</span>
+              <input id="routingNumberInput" class="input mt-1.5 w-full rounded-2xl px-3.5 py-3 text-sm" type="tel" inputmode="tel" autocomplete="tel" placeholder="+234…" />
+              <p class="mt-1 text-[10px] text-slate-400">International E.164 format is supported, e.g. +2348012345678.</p>
+            </label>
+            <button id="saveProfileButton" class="w-full rounded-2xl py-3.5 bg-recall-950 text-white text-sm font-extrabold shadow-glow">
+              Save settings
+            </button>
+          </div>
+        </section>
+
+        <section class="card rounded-3xl bg-white p-4">
+          <h3 class="font-bold">Account</h3>
+          <div class="mt-3 space-y-2">
+            <div class="flex items-center justify-between rounded-2xl bg-slate-50 px-3.5 py-3">
+              <span class="text-xs text-slate-500">Signed in as</span>
+              <span id="accountEmail" class="text-xs font-bold max-w-[210px] truncate">—</span>
+            </div>
+            <button id="signOutButton" class="w-full rounded-2xl py-3.5 border border-rose-200 bg-rose-50 text-rose-600 text-sm font-extrabold">
+              Sign out
+            </button>
+          </div>
+        </section>
       </section>
     </main>
 
-
-    <!-- MOBILE NAV -->
-
-    <nav class="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white md:hidden">
-      <div class="grid grid-cols-3">
-
-        <button
-          data-view="home"
-          type="button"
-          class="mobile-nav-button py-3 text-xs font-black"
-        >
-          Overview
+    <!-- =========================
+         BOTTOM NAVIGATION
+         ========================= -->
+    <nav class="absolute bottom-0 left-0 right-0 px-4 pt-3 bg-white/88 backdrop-blur-xl border-t border-slate-200/80 safe-bottom z-20">
+      <div class="grid grid-cols-3 gap-2">
+        <button class="nav-pill active rounded-2xl px-3 py-2.5 text-slate-500 flex flex-col items-center gap-1.5" data-view-btn="home">
+          <span class="nav-icon w-8 h-7 rounded-xl grid place-items-center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="m4 11 8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1v-8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="text-[10px] font-extrabold">Home</span>
         </button>
 
-        <button
-          data-view="leads"
-          type="button"
-          class="mobile-nav-button py-3 text-xs font-black text-slate-400"
-        >
-          Leads
+        <button class="nav-pill rounded-2xl px-3 py-2.5 text-slate-500 flex flex-col items-center gap-1.5" data-view-btn="leads">
+          <span class="nav-icon w-8 h-7 rounded-xl grid place-items-center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 7.5h12M6 12h8M6 16.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="18.2" cy="12" r="2" fill="currentColor"/></svg>
+          </span>
+          <span class="text-[10px] font-extrabold">Leads</span>
         </button>
 
-        <button
-          data-view="profile"
-          type="button"
-          class="mobile-nav-button py-3 text-xs font-black text-slate-400"
-        >
-          Profile
+        <button class="nav-pill rounded-2xl px-3 py-2.5 text-slate-500 flex flex-col items-center gap-1.5" data-view-btn="profile">
+          <span class="nav-icon w-8 h-7 rounded-xl grid place-items-center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 20c.8-3.5 3-5.2 6.5-5.2s5.7 1.7 6.5 5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <span class="text-[10px] font-extrabold">Profile</span>
         </button>
-
       </div>
     </nav>
 
+    <!-- TOAST -->
+    <div id="toast" class="pointer-events-none fixed left-1/2 -translate-x-1/2 bottom-24 hidden z-50">
+      <div class="rounded-2xl bg-slate-950 text-white px-4 py-3 text-xs font-bold shadow-2xl"></div>
+    </div>
   </div>
-
-
-  <!-- =========================================================
-       TOAST
-       ========================================================= -->
-
-  <div
-    id="toast"
-    class="pointer-events-none fixed left-1/2 bottom-24 z-50 hidden -translate-x-1/2"
-  >
-    <div
-      id="toastMessage"
-      class="rounded-2xl bg-slate-950 px-4 py-3 text-xs font-bold text-white shadow-2xl"
-    ></div>
-  </div>
-
-
-  <!-- =========================================================
-       COMPLETE JAVASCRIPT
-       ========================================================= -->
 
   <script>
     /* =========================================================
        RECALL FRONTEND CONFIG
+       Replace ONLY the two Supabase values below.
+       NEVER put a service_role key in frontend code.
        ========================================================= */
-
     const CONFIG = {
-      SUPABASE_URL: "https://qyfxijdzayvaietjonzw.supabase.co",
+      SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
+      SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY",
 
-      SUPABASE_ANON_KEY:
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5ZnhpamR6YXl2YWlldGpvbnp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2MjAyOTAsImV4cCI6MjEwNDE5NjI5MH0.txde2HWklchF_0WNQbmJeOI0jqjn-A-x1d9fMu9w2ck",
+      // Optional FastAPI base URL for future authenticated actions.
+      // Example: "https://api.example.com"
+      FASTAPI_BASE_URL: "",
 
-      FASTAPI_BASE_URL:
-        "https://auto-recover-ai.onrender.com",
-
-      BUSINESS_TABLE:
-        "businesses",
-
-      LEADS_TABLE:
-        "leads"
+      // Tables used by the UI.
+      BUSINESS_TABLE: "businesses",
+      LEADS_TABLE: "leads"
     };
 
+    /* =========================================================
+       APPLICATION STATE
+       ========================================================= */
+    const state = {
+      supabase: null,
+      user: null,
+      business: null,
+      leads: [],
+      activeView: "home",
+      activeLeadFilter: "all",
+      channel: null
+    };
 
     /* =========================================================
-       GLOBAL STATE
+       SMALL UTILITIES
        ========================================================= */
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => [...document.querySelectorAll(selector)];
 
-    let supabaseClient = null;
-
-    let currentSession = null;
-
-    let currentUser = null;
-
-    let currentBusiness = null;
-
-    let allLeads = [];
-
-    let currentLeadFilter = "all";
-
-    let authMode = "signin";
-
-    let realtimeChannel = null;
-
-
-    /* =========================================================
-       BASIC HELPERS
-       ========================================================= */
-
-    function $(id) {
-      return document.getElementById(id);
+    function safeText(value, fallback = "—") {
+      return value === null || value === undefined || String(value).trim() === ""
+        ? fallback
+        : String(value).trim();
     }
 
+    function getFirst(obj, keys, fallback = null) {
+      for (const key of keys) {
+        const value = obj?.[key];
+        if (value !== null && value !== undefined && String(value).trim() !== "") {
+          return value;
+        }
+      }
+      return fallback;
+    }
 
-    function escapeHTML(value) {
-      if (value === null || value === undefined) {
-        return "";
+    function titleCase(value) {
+      return String(value || "")
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/\b\w/g, (m) => m.toUpperCase());
+    }
+
+    function normalizeStatus(status) {
+      const raw = String(status || "Inquiry").trim().toLowerCase();
+      if (["booked", "confirmed", "appointment", "scheduled", "won"].includes(raw)) return "Booked";
+      if (["pending", "follow up", "follow-up", "contacted", "recovering"].includes(raw)) return "Pending";
+      if (["inquiry", "new", "lead", "missed", "open"].includes(raw)) return "Inquiry";
+      return titleCase(raw) || "Inquiry";
+    }
+
+    function statusClasses(status) {
+      const value = normalizeStatus(status);
+      if (value === "Booked") return {
+        text: "text-emerald-700",
+        bg: "bg-emerald-50",
+        dot: "bg-emerald-500"
+      };
+      if (value === "Pending") return {
+        text: "text-amber-700",
+        bg: "bg-amber-50",
+        dot: "bg-amber-500"
+      };
+      return {
+        text: "text-recall-800",
+        bg: "bg-recall-100",
+        dot: "bg-recall-600"
+      };
+    }
+
+    function formatCurrency(value, currency = "NGN") {
+      const amount = Number(value || 0);
+      if (!Number.isFinite(amount)) return currency === "NGN" ? "₦0" : "$0";
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency,
+          maximumFractionDigits: 0
+        }).format(amount);
+      } catch {
+        return currency === "NGN" ? `₦${Math.round(amount).toLocaleString()}` : `$${Math.round(amount).toLocaleString()}`;
+      }
+    }
+
+    function formatRelativeTime(dateValue) {
+      if (!dateValue) return "No timestamp";
+      const date = new Date(dateValue);
+      if (Number.isNaN(date.getTime())) return "Just now";
+
+      const diff = Date.now() - date.getTime();
+      const sec = Math.max(0, Math.floor(diff / 1000));
+
+      if (sec < 45) return "Just now";
+      if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+      if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+      if (sec < 604800) return `${Math.floor(sec / 86400)}d ago`;
+
+      return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    }
+
+    function initials(name) {
+      const words = String(name || "R").trim().split(/\s+/).slice(0, 2);
+      return words.map(w => w[0]).join("").toUpperCase() || "R";
+    }
+
+    function greetingByHour() {
+      const hour = new Date().getHours();
+      if (hour < 12) return "Good morning";
+      if (hour < 18) return "Good afternoon";
+      return "Good evening";
+    }
+
+    function sanitizePhone(raw) {
+      if (!raw) return "";
+      const input = String(raw).trim();
+      // Keep + and digits. This supports E.164 while being forgiving of spaces/dashes.
+      const cleaned = input.replace(/[^\d+]/g, "");
+      if (cleaned.startsWith("+")) return "+" + cleaned.slice(1).replace(/\+/g, "");
+      return cleaned.replace(/\+/g, "");
+    }
+
+    function leadName(lead) {
+      return safeText(getFirst(lead, ["customer_name", "client_name", "name", "contact_name", "caller_name", "full_name"]), "Unknown caller");
+    }
+
+    function leadPhone(lead) {
+      return safeText(getFirst(lead, ["phone", "customer_phone", "client_phone", "caller_phone", "phone_number"]), "No number");
+    }
+
+    function leadTimestamp(lead) {
+      return getFirst(lead, ["updated_at", "created_at", "received_at", "called_at", "timestamp"]);
+    }
+
+    function leadRevenue(lead) {
+      return Number(getFirst(lead, [
+        "recovered_revenue",
+        "revenue_recovered",
+        "amount_recovered",
+        "booking_value",
+        "recovered_amount",
+        "revenue",
+        "value"
+      ], 0)) || 0;
+    }
+
+    function isBooked(lead) {
+      return normalizeStatus(getFirst(lead, ["status", "lead_status", "outcome", "stage"], "Inquiry")) === "Booked";
+    }
+
+    function parseBoolean(value, fallback = false) {
+      if (value === null || value === undefined || value === "") return fallback;
+      if (typeof value === "boolean") return value;
+      const raw = String(value).trim().toLowerCase();
+      if (["true", "1", "yes", "y", "on"].includes(raw)) return true;
+      if (["false", "0", "no", "n", "off"].includes(raw)) return false;
+      return fallback;
+    }
+
+    function isCallCaught(lead) {
+      const explicit = getFirst(lead, ["call_caught", "caught", "is_recovered", "recovered", "missed_call_recovered"]);
+      if (explicit !== null) return parseBoolean(explicit, false);
+      // In the absence of a call flag, an existing lead row is treated as a caught opportunity.
+      return true;
+    }
+
+    function monthStartISO() {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    }
+
+    function showToast(message, tone = "dark") {
+      const toast = $("#toast");
+      const box = toast.firstElementChild;
+      box.textContent = message;
+      box.className = "rounded-2xl px-4 py-3 text-xs font-bold shadow-2xl " +
+        (tone === "success" ? "bg-emerald-600 text-white" :
+         tone === "error" ? "bg-rose-600 text-white" :
+         "bg-slate-950 text-white");
+      toast.classList.remove("hidden");
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => toast.classList.add("hidden"), 2600);
+    }
+
+    function setLoading(isLoading) {
+      $("#refreshIcon").classList.toggle("animate-spin", isLoading);
+      $("#refreshButton").disabled = isLoading;
+      $("#refreshButton").classList.toggle("opacity-60", isLoading);
+    }
+
+    /* =========================================================
+       SUPABASE / SESSION
+       ========================================================= */
+    function initSupabase() {
+      const hasConfig =
+        CONFIG.SUPABASE_URL &&
+        CONFIG.SUPABASE_ANON_KEY &&
+        !CONFIG.SUPABASE_URL.includes("YOUR_PROJECT") &&
+        !CONFIG.SUPABASE_ANON_KEY.includes("YOUR_SUPABASE_ANON_KEY");
+
+      if (!hasConfig || !window.supabase?.createClient) {
+        renderDemoState();
+        return false;
       }
 
-      return String(value)
+      state.supabase = window.supabase.createClient(
+        CONFIG.SUPABASE_URL,
+        CONFIG.SUPABASE_ANON_KEY,
+        {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+          }
+        }
+      );
+
+      state.supabase.auth.onAuthStateChange(async (_event, session) => {
+        state.user = session?.user || null;
+
+        if (!state.user) {
+          renderSignedOutState();
+          return;
+        }
+
+        await bootstrapData();
+      });
+
+      return true;
+    }
+
+    async function requireSession() {
+      const { data, error } = await state.supabase.auth.getSession();
+      if (error) throw error;
+      state.user = data.session?.user || null;
+      return state.user;
+    }
+
+    async function signOut() {
+      if (!state.supabase) return;
+      const { error } = await state.supabase.auth.signOut();
+      if (error) {
+        showToast(error.message, "error");
+        return;
+      }
+      showToast("Signed out.", "success");
+    }
+
+    /* =========================================================
+       DATA ACCESS LAYER
+       Keep all Supabase query logic here so schema changes
+       can be handled in one predictable place.
+       ========================================================= */
+    async function fetchBusiness() {
+      const user = state.user;
+      if (!user) return null;
+
+      const table = CONFIG.BUSINESS_TABLE;
+
+      // Standard pattern: businesses.owner_id references auth.users.id.
+      let query = state.supabase
+        .from(table)
+        .select("*")
+        .eq("owner_id", user.id)
+        .limit(1)
+        .maybeSingle();
+
+      let { data, error } = await query;
+
+      // Graceful fallback for teams using user_id instead of owner_id.
+      if (error && /owner_id/i.test(error.message || "")) {
+        ({ data, error } = await state.supabase
+          .from(table)
+          .select("*")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle());
+      }
+
+      if (error) throw error;
+
+      // Some schemas link business rows by auth email.
+      if (!data) {
+        const email = user.email;
+        if (email) {
+          const fallback = await state.supabase
+            .from(table)
+            .select("*")
+            .eq("email", email)
+            .limit(1)
+            .maybeSingle();
+          if (!fallback.error) data = fallback.data;
+        }
+      }
+
+      return data || null;
+    }
+
+    async function fetchLeads(business) {
+      const table = CONFIG.LEADS_TABLE;
+      const select = "*";
+      const monthISO = monthStartISO();
+
+      // Prefer business_id. If the schema is user-scoped instead, fall back to user_id.
+      let query;
+      if (business?.id) {
+        query = state.supabase
+          .from(table)
+          .select(select)
+          .eq("business_id", business.id)
+          .order("updated_at", { ascending: false })
+          .limit(250);
+      } else {
+        query = state.supabase
+          .from(table)
+          .select(select)
+          .eq("owner_id", state.user.id)
+          .order("updated_at", { ascending: false })
+          .limit(250);
+      }
+
+      let { data, error } = await query;
+
+      if (error && /updated_at/i.test(error.message || "")) {
+        // Common schema fallback: created_at is used for the feed timestamp.
+        if (business?.id) {
+          ({ data, error } = await state.supabase
+            .from(table)
+            .select(select)
+            .eq("business_id", business.id)
+            .order("created_at", { ascending: false })
+            .limit(250));
+        } else {
+          ({ data, error } = await state.supabase
+            .from(table)
+            .select(select)
+            .eq("owner_id", state.user.id)
+            .order("created_at", { ascending: false })
+            .limit(250));
+        }
+      }
+
+      if (error) {
+        // Last-resort: fetch by user_id when the lead table is user-scoped.
+        if (business?.id && /business_id/i.test(error.message || "")) {
+          ({ data, error } = await state.supabase
+            .from(table)
+            .select(select)
+            .eq("user_id", state.user.id)
+            .order("created_at", { ascending: false })
+            .limit(250));
+        } else if (!business?.id && /owner_id/i.test(error.message || "")) {
+          // Some schemas use user_id instead of owner_id.
+          ({ data, error } = await state.supabase
+            .from(table)
+            .select(select)
+            .eq("user_id", state.user.id)
+            .order("created_at", { ascending: false })
+            .limit(250));
+        }
+      }
+
+      if (error) throw error;
+
+      // Month-level filtering stays client-side to remain schema-flexible.
+      // We still keep the full recent feed in state for the Leads tab.
+      return Array.isArray(data) ? data : [];
+    }
+
+    async function bootstrapData() {
+      setLoading(true);
+      try {
+        await requireSession();
+
+        if (!state.user) {
+          renderSignedOutState();
+          return;
+        }
+
+        state.business = await fetchBusiness();
+        state.leads = await fetchLeads(state.business);
+
+        renderAll();
+        subscribeRealtime();
+      } catch (error) {
+        console.error(error);
+        showToast(error.message || "Unable to load your Recall data.", "error");
+        renderErrorState(error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    /* =========================================================
+       REALTIME
+       ========================================================= */
+    function subscribeRealtime() {
+      if (!state.supabase || !state.business?.id) return;
+
+      if (state.channel) {
+        state.supabase.removeChannel(state.channel);
+        state.channel = null;
+      }
+
+      state.channel = state.supabase
+        .channel(`recall-leads-${state.business.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: CONFIG.LEADS_TABLE,
+            filter: `business_id=eq.${state.business.id}`
+          },
+          async () => {
+            // Re-query instead of manually patching rows so all derived metrics stay correct.
+            try {
+              state.leads = await fetchLeads(state.business);
+              renderAll();
+            } catch (error) {
+              console.error("Realtime refresh failed:", error);
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    /* =========================================================
+       DERIVED METRICS
+       ========================================================= */
+    function getMonthlyLeads() {
+      const start = new Date(monthStartISO()).getTime();
+      return state.leads.filter((lead) => {
+        const t = new Date(leadTimestamp(lead) || 0).getTime();
+        return Number.isFinite(t) && t >= start;
+      });
+    }
+
+    function calculateMetrics() {
+      const monthly = getMonthlyLeads();
+      const revenue = monthly.reduce((sum, lead) => sum + leadRevenue(lead), 0);
+      const caught = monthly.filter(isCallCaught).length;
+      const booked = monthly.filter(isBooked).length;
+      const conversion = caught > 0 ? Math.round((booked / caught) * 100) : 0;
+      return { revenue, caught, booked, conversion };
+    }
+
+    /* =========================================================
+       RENDERING
+       ========================================================= */
+    function renderIdentity() {
+      const businessName = getFirst(state.business, ["business_name", "name", "company_name"], null);
+      const ownerName = getFirst(
+        state.business,
+        ["owner_name", "full_name", "contact_name", "admin_name"],
+        getFirst(state.user?.user_metadata || {}, ["full_name", "name", "display_name"], null)
+      );
+
+      const greeting = businessName || ownerName || "Welcome back";
+
+      $("#greetingLine").textContent = greetingByHour();
+      $("#businessGreeting").textContent = businessName || greeting;
+      $("#ownerSubline").textContent = ownerName
+        ? `${ownerName}, your AI recovery system is monitoring missed calls.`
+        : "Your AI recovery system is monitoring missed calls.";
+
+      $("#profileBusinessName").textContent = businessName || "Your business";
+      $("#profileOwnerName").textContent = ownerName || "Owner";
+      $("#profileAvatar").textContent = initials(businessName || ownerName || "Recall");
+      $("#accountEmail").textContent = safeText(state.user?.email);
+
+      $("#businessNameInput").value = businessName || "";
+      $("#ownerNameInput").value = ownerName || "";
+      $("#routingNumberInput").value = getFirst(
+        state.business,
+        ["routing_number", "assigned_routing_number", "phone_number", "inbound_number"],
+        ""
+      ) || "";
+
+      const active = Boolean(getFirst(state.business, ["is_active", "active", "subscription_active"], false));
+      $("#subscriptionStatus").textContent = active ? "Your subscription is active" : "Subscription is inactive";
+      $("#subscriptionBadge").textContent = active ? "ACTIVE" : "INACTIVE";
+      $("#subscriptionBadge").className =
+        "px-2.5 py-1.5 rounded-full text-[10px] font-extrabold border " +
+        (active
+          ? "bg-emerald-400/15 text-emerald-200 border-emerald-300/20"
+          : "bg-rose-400/15 text-rose-200 border-rose-300/20");
+    }
+
+    function renderMetrics() {
+      const metrics = calculateMetrics();
+      // Adjust currency here if your business billing currency is not NGN.
+      const currency = getFirst(state.business, ["currency", "billing_currency"], "NGN") || "NGN";
+
+      $("#metricRevenue").textContent = formatCurrency(metrics.revenue, currency);
+      $("#metricCalls").textContent = metrics.caught.toLocaleString();
+      $("#metricBooked").textContent = metrics.booked.toLocaleString();
+      $("#metricConversion").textContent = `${metrics.conversion}%`;
+
+      $("#heroRevenue").textContent = formatCurrency(metrics.revenue, currency);
+      $("#heroLeads").textContent = state.leads.length.toLocaleString();
+      $("#leadCount").textContent = state.leads.length.toLocaleString();
+    }
+
+    function leadCardMarkup(lead, compact = false) {
+      const name = leadName(lead);
+      const phone = leadPhone(lead);
+      const status = normalizeStatus(getFirst(lead, ["status", "lead_status", "outcome", "stage"], "Inquiry"));
+      const styles = statusClasses(status);
+      const note = getFirst(lead, ["summary", "message", "notes", "last_message", "inquiry"], "Missed call captured. Recall is following up.");
+      const revenue = leadRevenue(lead);
+      const timestamp = formatRelativeTime(leadTimestamp(lead));
+
+      return `
+        <article class="${compact ? "px-4 py-3" : "p-4"} bg-white">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 shrink-0 rounded-2xl bg-gradient-to-br from-recall-100 to-cyan-50 text-recall-950 grid place-items-center text-xs font-extrabold">
+              ${initials(name)}
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-sm font-extrabold truncate">${escapeHtml(name)}</p>
+                  <p class="mt-0.5 text-[11px] text-slate-400 truncate">${escapeHtml(phone)}</p>
+                </div>
+                <span class="shrink-0 inline-flex items-center gap-1.5 ${styles.bg} ${styles.text} rounded-full px-2 py-1 text-[10px] font-extrabold">
+                  <span class="status-dot ${styles.dot}"></span>${escapeHtml(status)}
+                </span>
+              </div>
+              ${compact ? "" : `<p class="mt-3 text-xs text-slate-500 leading-relaxed">${escapeHtml(note)}</p>`}
+              <div class="mt-3 flex items-center justify-between gap-3">
+                <span class="text-[10px] font-semibold text-slate-400">${escapeHtml(timestamp)}</span>
+                <span class="text-[10px] font-extrabold ${revenue > 0 ? "text-emerald-600" : "text-slate-400"}">
+                  ${revenue > 0 ? "+" + formatCurrency(revenue, getFirst(state.business, ["currency"], "NGN") || "NGN") : "No revenue yet"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderHomeLeadFeed() {
+      const container = $("#homeLeadFeed");
+      const leads = state.leads.slice(0, 5);
+
+      if (!leads.length) {
+        container.innerHTML = `
+          <div class="p-6 text-center">
+            <div class="w-12 h-12 rounded-2xl bg-recall-100 text-recall-950 mx-auto grid place-items-center font-extrabold">0</div>
+            <p class="mt-3 text-sm font-bold">No recovered leads yet</p>
+            <p class="mt-1 text-xs text-slate-400">Your live recovery feed will appear here.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = leads.map((lead) => leadCardMarkup(lead, true)).join("");
+    }
+
+    function renderLeads() {
+      const filter = state.activeLeadFilter;
+      const filtered = state.leads.filter((lead) => filter === "all" || normalizeStatus(getFirst(lead, ["status", "lead_status", "outcome", "stage"], "Inquiry")) === filter);
+      const container = $("#leadsList");
+
+      if (!filtered.length) {
+        container.innerHTML = `
+          <div class="card rounded-3xl bg-white p-7 text-center">
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 grid place-items-center text-slate-500">—</div>
+            <p class="mt-3 text-sm font-bold">No ${filter === "all" ? "" : filter.toLowerCase() + " "}leads</p>
+            <p class="mt-1 text-xs text-slate-400">New recovery activity will appear here automatically.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map((lead) => {
+        return `<div class="card rounded-3xl overflow-hidden">${leadCardMarkup(lead, false)}</div>`;
+      }).join("");
+    }
+
+    function renderAll() {
+      renderIdentity();
+      renderMetrics();
+      renderHomeLeadFeed();
+      renderLeads();
+    }
+
+    function renderErrorState(error) {
+      const message = safeText(error?.message, "Data could not be loaded.");
+      $("#homeLeadFeed").innerHTML = `
+        <div class="p-6">
+          <p class="text-sm font-extrabold text-rose-600">Could not load live data</p>
+          <p class="mt-1 text-xs text-slate-500 leading-relaxed">${escapeHtml(message)}</p>
+          <button id="retryButton" class="mt-4 rounded-xl bg-slate-950 text-white px-3.5 py-2.5 text-xs font-bold">Retry</button>
+        </div>
+      `;
+      $("#retryButton")?.addEventListener("click", bootstrapData);
+    }
+
+    function renderDemoState() {
+      // Demo records keep the interface visually complete while config is being connected.
+      // They are not mixed into Supabase state once valid credentials are supplied.
+      state.user = {
+        id: "demo-user",
+        email: "owner@example.com",
+        user_metadata: { full_name: "Demo Owner" }
+      };
+      state.business = {
+        id: "demo-business",
+        name: "Your Business",
+        owner_name: "Demo Owner",
+        is_active: true,
+        currency: "NGN",
+        routing_number: "+2348012345678"
+      };
+
+      state.leads = [
+        {
+          id: "1",
+          name: "Amina Okafor",
+          phone: "+2348031234567",
+          status: "Booked",
+          recovered_revenue: 185000,
+          created_at: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
+          summary: "AI follow-up converted a missed call into a confirmed appointment."
+        },
+        {
+          id: "2",
+          name: "Daniel Eze",
+          phone: "+2348097654321",
+          status: "Pending",
+          recovered_revenue: 0,
+          created_at: new Date(Date.now() - 39 * 60 * 1000).toISOString(),
+          summary: "Follow-up is waiting for customer confirmation."
+        },
+        {
+          id: "3",
+          name: "Chioma Bello",
+          phone: "+2348123456789",
+          status: "Inquiry",
+          recovered_revenue: 75000,
+          created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+          summary: "Caller requested a quote and is being nurtured by Recall."
+        }
+      ];
+
+      renderAll();
+      showToast("Demo mode — add your Supabase keys to go live.", "dark");
+    }
+
+    function renderSignedOutState() {
+      showToast("No active session. Sign in through your existing auth flow.", "error");
+    }
+
+    /* =========================================================
+       PROFILE SAVE
+       Updates the current business row without hard-coding a
+       database schema beyond common column names.
+       ========================================================= */
+    async function saveProfile() {
+      if (!state.supabase || !state.business?.id) {
+        showToast("Connect Supabase first.", "error");
+        return;
+      }
+
+      const businessName = $("#businessNameInput").value.trim();
+      const ownerName = $("#ownerNameInput").value.trim();
+      const routingNumber = sanitizePhone($("#routingNumberInput").value);
+
+      if (routingNumber && !/^\+[1-9]\d{7,14}$/.test(routingNumber)) {
+        showToast("Use an E.164 phone number such as +2348012345678.", "error");
+        return;
+      }
+
+      const patch = {};
+
+      // Only send fields known to exist in this common schema.
+      // For a different naming convention, change these lines in one block.
+      if (businessName) patch.business_name = businessName;
+      if (ownerName) patch.owner_name = ownerName;
+      if (routingNumber) patch.routing_number = routingNumber;
+
+      const { error } = await state.supabase
+        .from(CONFIG.BUSINESS_TABLE)
+        .update(patch)
+        .eq("id", state.business.id);
+
+      if (error) {
+        showToast(error.message, "error");
+        return;
+      }
+
+      state.business = { ...state.business, ...patch };
+      renderIdentity();
+      showToast("Profile saved.", "success");
+    }
+
+    /* =========================================================
+       OPTIONAL FASTAPI HELPER
+       The browser automatically forwards the Supabase JWT for
+       protected FastAPI endpoints. Keep FastAPI actions behind
+       your normal Bearer-token verification middleware.
+       ========================================================= */
+    async function fetchFromFastAPI(path, options = {}) {
+      if (!CONFIG.FASTAPI_BASE_URL) throw new Error("FASTAPI_BASE_URL is not configured.");
+      if (!state.supabase) throw new Error("Supabase is not initialized.");
+
+      const { data } = await state.supabase.auth.getSession();
+      const token = data?.session?.access_token;
+
+      const response = await fetch(`${CONFIG.FASTAPI_BASE_URL}${path}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `FastAPI request failed (${response.status})`);
+      }
+      return response.json();
+    }
+
+    /* =========================================================
+       NAVIGATION
+       ========================================================= */
+    function switchView(view) {
+      state.activeView = view;
+      $$(".view").forEach((section) => section.classList.toggle("hidden", section.dataset.view !== view));
+      $$(".nav-pill").forEach((button) => button.classList.toggle("active", button.dataset.viewBtn === view));
+
+      const titles = { home: "Dashboard", leads: "Lead activity", profile: "Profile" };
+      $("#pageTitle").textContent = titles[view] || "Recall";
+      $("#mainView").scrollTop = 0;
+    }
+
+    /* =========================================================
+       HTML ESCAPING
+       ========================================================= */
+    function escapeHtml(input) {
+      return String(input ?? "")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
@@ -707,1608 +1235,68 @@
         .replace(/'/g, "&#039;");
     }
 
-
-    function parseBoolean(value) {
-      if (typeof value === "boolean") {
-        return value;
-      }
-
-      if (typeof value === "number") {
-        return value === 1;
-      }
-
-      if (typeof value === "string") {
-        const normalized = value.trim().toLowerCase();
-
-        if (
-          normalized === "true" ||
-          normalized === "1" ||
-          normalized === "yes" ||
-          normalized === "y"
-        ) {
-          return true;
-        }
-
-        if (
-          normalized === "false" ||
-          normalized === "0" ||
-          normalized === "no" ||
-          normalized === "n" ||
-          normalized === ""
-        ) {
-          return false;
-        }
-      }
-
-      return false;
-    }
-
-
-    function normalizeStatus(value) {
-      const status = String(value || "")
-        .trim()
-        .toLowerCase();
-
-      if (
-        status.includes("book") ||
-        status.includes("appointment") ||
-        status.includes("converted") ||
-        status.includes("won")
-      ) {
-        return "Booked";
-      }
-
-      if (
-        status.includes("pending") ||
-        status.includes("follow") ||
-        status.includes("contact")
-      ) {
-        return "Pending";
-      }
-
-      if (
-        status.includes("inquir") ||
-        status.includes("new") ||
-        status.includes("lead")
-      ) {
-        return "Inquiry";
-      }
-
-      return "Inquiry";
-    }
-
-
-    function getLeadName(lead) {
-      return (
-        lead?.name ||
-        lead?.full_name ||
-        lead?.customer_name ||
-        lead?.contact_name ||
-        lead?.lead_name ||
-        "Unknown lead"
-      );
-    }
-
-
-    function getLeadEmail(lead) {
-      return (
-        lead?.email ||
-        lead?.customer_email ||
-        lead?.contact_email ||
-        ""
-      );
-    }
-
-
-    function getLeadPhone(lead) {
-      return (
-        lead?.phone ||
-        lead?.customer_phone ||
-        lead?.contact_phone ||
-        ""
-      );
-    }
-
-
-    function getLeadMessage(lead) {
-      return (
-        lead?.message ||
-        lead?.notes ||
-        lead?.content ||
-        lead?.description ||
-        ""
-      );
-    }
-
-
-    function getLeadDate(lead) {
-      return (
-        lead?.updated_at ||
-        lead?.created_at ||
-        lead?.inserted_at ||
-        null
-      );
-    }
-
-
-    function formatDate(value) {
-      if (!value) {
-        return "Unknown date";
-      }
-
-      const date = new Date(value);
-
-      if (Number.isNaN(date.getTime())) {
-        return "Unknown date";
-      }
-
-      return date.toLocaleString([], {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit"
-      });
-    }
-
-
-    function showToast(message) {
-      const toast = $("toast");
-      const toastMessage = $("toastMessage");
-
-      if (!toast || !toastMessage) {
-        return;
-      }
-
-      toastMessage.textContent = message;
-
-      toast.classList.remove("hidden");
-      toast.classList.add("toast-show");
-
-      clearTimeout(showToast.timer);
-
-      showToast.timer = setTimeout(() => {
-        toast.classList.add("hidden");
-        toast.classList.remove("toast-show");
-      }, 3000);
-    }
-
-
-    function setAuthMessage(message, error = false) {
-      const element = $("authMessage");
-
-      if (!element) {
-        return;
-      }
-
-      element.textContent = message || "";
-
-      element.classList.toggle("hidden", !message);
-
-      if (error) {
-        element.className =
-          "mt-4 rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700";
-      } else {
-        element.className =
-          "mt-4 rounded-xl bg-slate-100 p-3 text-xs font-semibold text-slate-700";
-      }
-    }
-
-
-    /* =========================================================
-       SUPABASE INIT
-       ========================================================= */
-
-    function initSupabase() {
-      if (
-        !CONFIG.SUPABASE_URL ||
-        !CONFIG.SUPABASE_ANON_KEY
-      ) {
-        console.error("Supabase configuration is missing.");
-        return false;
-      }
-
-      if (
-        !window.supabase ||
-        typeof window.supabase.createClient !== "function"
-      ) {
-        console.error("Supabase SDK failed to load.");
-        return false;
-      }
-
-      try {
-        supabaseClient = window.supabase.createClient(
-          CONFIG.SUPABASE_URL,
-          CONFIG.SUPABASE_ANON_KEY,
-          {
-            auth: {
-              persistSession: true,
-              autoRefreshToken: true,
-              detectSessionInUrl: true
-            }
-          }
-        );
-
-        return true;
-      } catch (error) {
-        console.error("Supabase initialization failed:", error);
-        return false;
-      }
-    }
-
-
-    /* =========================================================
-       AUTH MODE
-       ========================================================= */
-
-    function setAuthMode(mode) {
-      authMode = mode;
-
-      const signInTab = $("signInTab");
-      const signUpTab = $("signUpTab");
-      const nameField = $("nameField");
-      const submit = $("authSubmit");
-      const forgot = $("forgotPassword");
-
-      if (mode === "signup") {
-        signUpTab.className =
-          "rounded-lg bg-white px-4 py-2.5 text-sm font-bold shadow-sm";
-
-        signInTab.className =
-          "rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500";
-
-        nameField.classList.remove("hidden");
-
-        submit.textContent = "Create account";
-
-        forgot.classList.add("hidden");
-      } else {
-        signInTab.className =
-          "rounded-lg bg-white px-4 py-2.5 text-sm font-bold shadow-sm";
-
-        signUpTab.className =
-          "rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500";
-
-        nameField.classList.add("hidden");
-
-        submit.textContent = "Sign in";
-
-        forgot.classList.remove("hidden");
-      }
-
-      setAuthMessage("");
-    }
-
-
-    /* =========================================================
-       AUTH
-       ========================================================= */
-
-    async function handleAuthSubmit(event) {
-      event.preventDefault();
-
-      if (!supabaseClient) {
-        setAuthMessage("Supabase is not configured.", true);
-        return;
-      }
-
-      const email = $("authEmail").value.trim();
-      const password = $("authPassword").value;
-      const businessName = $("authBusinessName").value.trim();
-
-      if (!email || !password) {
-        setAuthMessage("Email and password are required.", true);
-        return;
-      }
-
-      const button = $("authSubmit");
-
-      button.disabled = true;
-      button.textContent =
-        authMode === "signup"
-          ? "Creating account..."
-          : "Signing in...";
-
-      try {
-        if (authMode === "signup") {
-          const {
-            data,
-            error
-          } = await supabaseClient.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                business_name: businessName
-              }
-            }
-          });
-
-          if (error) {
-            throw error;
-          }
-
-          if (data?.session) {
-            showApp();
-          } else {
-            setAuthMessage(
-              "Account created. Check your email if confirmation is required."
-            );
-          }
-        } else {
-          const {
-            data,
-            error
-          } = await supabaseClient.auth.signInWithPassword({
-            email,
-            password
-          });
-
-          if (error) {
-            throw error;
-          }
-
-          currentSession = data.session;
-          currentUser = data.user;
-
-          await showApp();
-        }
-      } catch (error) {
-        console.error("Authentication error:", error);
-
-        setAuthMessage(
-          error?.message || "Authentication failed.",
-          true
-        );
-      } finally {
-        button.disabled = false;
-
-        button.textContent =
-          authMode === "signup"
-            ? "Create account"
-            : "Sign in";
-      }
-    }
-
-
-    async function handleForgotPassword() {
-      if (!supabaseClient) {
-        return;
-      }
-
-      const email = $("authEmail").value.trim();
-
-      if (!email) {
-        setAuthMessage(
-          "Enter your email address first.",
-          true
-        );
-
-        return;
-      }
-
-      try {
-        const redirectUrl =
-          `${window.location.origin}${window.location.pathname}`;
-
-        const {
-          error
-        } = await supabaseClient.auth.resetPasswordForEmail(
-          email,
-          {
-            redirectTo: redirectUrl
-          }
-        );
-
-        if (error) {
-          throw error;
-        }
-
-        setAuthMessage(
-          "Password reset instructions have been sent if the email exists."
-        );
-      } catch (error) {
-        console.error(error);
-
-        setAuthMessage(
-          error?.message || "Unable to send reset email.",
-          true
-        );
-      }
-    }
-
-
-    async function signOut() {
-      if (!supabaseClient) {
-        return;
-      }
-
-      try {
-        await supabaseClient.auth.signOut();
-      } catch (error) {
-        console.error("Sign out error:", error);
-      }
-
-      currentSession = null;
-      currentUser = null;
-      currentBusiness = null;
-      allLeads = [];
-
-      if (realtimeChannel) {
-        try {
-          await supabaseClient.removeChannel(
-            realtimeChannel
-          );
-        } catch (error) {
-          console.error(error);
-        }
-
-        realtimeChannel = null;
-      }
-
-      renderSignedOutState();
-    }
-
-
-    /* =========================================================
-       APP STATE
-       ========================================================= */
-
-    function renderSignedOutState() {
-      $("authScreen").classList.remove("hidden");
-      $("app").classList.add("hidden");
-      $("connectionStatus").classList.add("hidden");
-
-      setAuthMode("signin");
-    }
-
-
-    async function showApp() {
-      $("authScreen").classList.add("hidden");
-      $("app").classList.remove("hidden");
-
-      $("connectionStatus").classList.remove("hidden");
-
-      switchView("home");
-
-      await loadBusiness();
-
-      await loadLeads();
-
-      populateProfile();
-
-      subscribeToLeads();
-    }
-
-
-    /* =========================================================
-       BUSINESS LOOKUP
-       ========================================================= */
-
-    async function loadBusiness() {
-      if (!supabaseClient || !currentUser) {
-        return null;
-      }
-
-      const table = CONFIG.BUSINESS_TABLE;
-
-      let business = null;
-
-      /* -------------------------------------------------------
-         Attempt 1: owner_id
-         ------------------------------------------------------- */
-
-      try {
-        const result = await supabaseClient
-          .from(table)
-          .select("*")
-          .eq("owner_id", currentUser.id)
-          .limit(1);
-
-        if (!result.error && result.data?.length) {
-          business = result.data[0];
-        }
-      } catch (error) {
-        console.warn("owner_id business lookup failed:", error);
-      }
-
-
-      /* -------------------------------------------------------
-         Attempt 2: user_id
-         ------------------------------------------------------- */
-
-      if (!business) {
-        try {
-          const result = await supabaseClient
-            .from(table)
-            .select("*")
-            .eq("user_id", currentUser.id)
-            .limit(1);
-
-          if (!result.error && result.data?.length) {
-            business = result.data[0];
-          }
-        } catch (error) {
-          console.warn("user_id business lookup failed:", error);
-        }
-      }
-
-
-      /* -------------------------------------------------------
-         Attempt 3: email
-         ------------------------------------------------------- */
-
-      if (!business && currentUser.email) {
-        try {
-          const result = await supabaseClient
-            .from(table)
-            .select("*")
-            .eq("email", currentUser.email)
-            .limit(1);
-
-          if (!result.error && result.data?.length) {
-            business = result.data[0];
-          }
-        } catch (error) {
-          console.warn("email business lookup failed:", error);
-        }
-      }
-
-
-      currentBusiness = business;
-
-      if (business) {
-        $("welcomeTitle").textContent =
-          business.name ||
-          business.business_name ||
-          "Overview";
-      } else {
-        $("welcomeTitle").textContent = "Overview";
-      }
-
-      return business;
-    }
-
-
-    /* =========================================================
-       PROFILE
-       ========================================================= */
-
-    function populateProfile() {
-      const business = currentBusiness || {};
-
-      $("profileBusinessName").value =
-        business.name ||
-        business.business_name ||
-        "";
-
-      $("profileEmail").value =
-        business.email ||
-        currentUser?.email ||
-        "";
-
-      $("profilePhone").value =
-        business.phone ||
-        business.phone_number ||
-        "";
-
-      $("profileWebsite").value =
-        business.website ||
-        business.website_url ||
-        "";
-
-      $("profileRoutingNumber").value =
-        business.routing_number ||
-        "";
-
-      $("profileDescription").value =
-        business.description ||
-        business.business_description ||
-        "";
-    }
-
-
-    function validateRoutingNumber(value) {
-      if (!value) {
-        return true;
-      }
-
-      const clean = String(value)
-        .replace(/\s+/g, "")
-        .replace(/-/g, "");
-
-      return /^[A-Za-z0-9]{4,50}$/.test(clean);
-    }
-
-
-    async function saveProfile(event) {
-      event.preventDefault();
-
-      if (!supabaseClient || !currentUser) {
-        showToast("You are not signed in.");
-        return;
-      }
-
-      const button = $("saveProfile");
-
-      const name = $("profileBusinessName").value.trim();
-      const email = $("profileEmail").value.trim();
-      const phone = $("profilePhone").value.trim();
-      const website = $("profileWebsite").value.trim();
-      const routingNumber =
-        $("profileRoutingNumber").value.trim();
-      const description =
-        $("profileDescription").value.trim();
-
-      if (!name) {
-        showToast("Business name is required.");
-        return;
-      }
-
-      if (!validateRoutingNumber(routingNumber)) {
-        showToast("Invalid routing number format.");
-        return;
-      }
-
-      button.disabled = true;
-      button.textContent = "Saving...";
-
-      try {
-        const payload = {
-          name,
-          email,
-          phone,
-          website,
-          routing_number: routingNumber,
-          description
-        };
-
-        let saved = false;
-
-        if (currentBusiness?.id) {
-          const result = await supabaseClient
-            .from(CONFIG.BUSINESS_TABLE)
-            .update(payload)
-            .eq("id", currentBusiness.id)
-            .select()
-            .limit(1);
-
-          if (result.error) {
-            throw result.error;
-          }
-
-          if (result.data?.length) {
-            currentBusiness = result.data[0];
-          }
-
-          saved = true;
-        }
-
-
-        /* -----------------------------------------------------
-           Create business record when none exists.
-           ----------------------------------------------------- */
-
-        if (!saved) {
-          const insertPayload = {
-            ...payload,
-            owner_id: currentUser.id
-          };
-
-          const result = await supabaseClient
-            .from(CONFIG.BUSINESS_TABLE)
-            .insert(insertPayload)
-            .select()
-            .limit(1);
-
-          if (result.error) {
-            throw result.error;
-          }
-
-          if (result.data?.length) {
-            currentBusiness = result.data[0];
-          }
-        }
-
-        $("welcomeTitle").textContent =
-          name || "Overview";
-
-        showToast("Business profile saved.");
-
-        await loadBusiness();
-      } catch (error) {
-        console.error("Profile save error:", error);
-
-        showToast(
-          error?.message ||
-          "Unable to save business profile."
-        );
-      } finally {
-        button.disabled = false;
-        button.textContent = "Save changes";
-      }
-    }
-
-
-    /* =========================================================
-       LEAD BUSINESS IDENTIFIERS
-       ========================================================= */
-
-    function getBusinessIds() {
-      const ids = [];
-
-      if (currentBusiness?.id) {
-        ids.push(currentBusiness.id);
-      }
-
-      if (currentBusiness?.business_id) {
-        ids.push(currentBusiness.business_id);
-      }
-
-      return [...new Set(ids)];
-    }
-
-
-    /* =========================================================
-       LOAD LEADS
-       ========================================================= */
-
-    async function loadLeads() {
-      if (!supabaseClient || !currentUser) {
-        return;
-      }
-
-      const table = CONFIG.LEADS_TABLE;
-
-      let leads = [];
-
-      const businessIds = getBusinessIds();
-
-
-      /* -------------------------------------------------------
-         Attempt 1: business_id
-         ------------------------------------------------------- */
-
-      if (businessIds.length) {
-        try {
-          const result = await supabaseClient
-            .from(table)
-            .select("*")
-            .in("business_id", businessIds)
-            .order("updated_at", {
-              ascending: false
-            });
-
-          if (!result.error) {
-            leads = result.data || [];
-          } else {
-            console.warn(
-              "Lead updated_at ordering failed:",
-              result.error
-            );
-
-            const fallback = await supabaseClient
-              .from(table)
-              .select("*")
-              .in("business_id", businessIds)
-              .order("created_at", {
-                ascending: false
-              });
-
-            if (!fallback.error) {
-              leads = fallback.data || [];
-            }
-          }
-        } catch (error) {
-          console.warn(
-            "business_id lead lookup failed:",
-            error
-          );
-        }
-      }
-
-
-      /* -------------------------------------------------------
-         Attempt 2: owner_id
-         ------------------------------------------------------- */
-
-      if (!leads.length) {
-        try {
-          const result = await supabaseClient
-            .from(table)
-            .select("*")
-            .eq("owner_id", currentUser.id)
-            .order("created_at", {
-              ascending: false
-            });
-
-          if (!result.error) {
-            leads = result.data || [];
-          }
-        } catch (error) {
-          console.warn(
-            "owner_id lead lookup failed:",
-            error
-          );
-        }
-      }
-
-
-      /* -------------------------------------------------------
-         Attempt 3: user_id
-         ------------------------------------------------------- */
-
-      if (!leads.length) {
-        try {
-          const result = await supabaseClient
-            .from(table)
-            .select("*")
-            .eq("user_id", currentUser.id)
-            .order("created_at", {
-              ascending: false
-            });
-
-          if (!result.error) {
-            leads = result.data || [];
-          }
-        } catch (error) {
-          console.warn(
-            "user_id lead lookup failed:",
-            error
-          );
-        }
-      }
-
-
-      allLeads = Array.isArray(leads)
-        ? leads
-        : [];
-
-      renderMetrics();
-
-      renderHomeLeads();
-
-      renderLeadList();
-
-      renderFilterCounts();
-    }
-
-
-    /* =========================================================
-       METRICS
-       ========================================================= */
-
-    function renderMetrics() {
-      const leads = allLeads;
-
-      let inquiry = 0;
-      let pending = 0;
-      let booked = 0;
-
-      leads.forEach((lead) => {
-        const status = normalizeStatus(
-          lead.status ||
-          lead.lead_status ||
-          lead.stage
-        );
-
-        if (status === "Booked") {
-          booked++;
-        } else if (status === "Pending") {
-          pending++;
-        } else {
-          inquiry++;
-        }
-      });
-
-      $("metricTotal").textContent =
-        leads.length;
-
-      $("metricInquiry").textContent =
-        inquiry;
-
-      $("metricPending").textContent =
-        pending;
-
-      $("metricBooked").textContent =
-        booked;
-    }
-
-
-    /* =========================================================
-       LEAD CARD
-       ========================================================= */
-
-    function renderLeadCard(lead) {
-      const name = getLeadName(lead);
-
-      const email = getLeadEmail(lead);
-
-      const phone = getLeadPhone(lead);
-
-      const message = getLeadMessage(lead);
-
-      const status = normalizeStatus(
-        lead.status ||
-        lead.lead_status ||
-        lead.stage
-      );
-
-      const date = formatDate(
-        getLeadDate(lead)
-      );
-
-      const statusClass =
-        status === "Booked"
-          ? "bg-emerald-50 text-emerald-700"
-          : status === "Pending"
-            ? "bg-amber-50 text-amber-700"
-            : "bg-slate-100 text-slate-600";
-
-      return `
-        <article class="p-5">
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-
-            <div class="min-w-0">
-
-              <div class="flex flex-wrap items-center gap-2">
-                <h3 class="truncate text-sm font-black">
-                  ${escapeHTML(name)}
-                </h3>
-
-                <span class="rounded-full px-2.5 py-1 text-[10px] font-black ${statusClass}">
-                  ${escapeHTML(status)}
-                </span>
-              </div>
-
-              <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-
-                ${
-                  email
-                    ? `<span>${escapeHTML(email)}</span>`
-                    : ""
-                }
-
-                ${
-                  phone
-                    ? `<span>${escapeHTML(phone)}</span>`
-                    : ""
-                }
-
-              </div>
-
-              ${
-                message
-                  ? `
-                    <p class="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                      ${escapeHTML(message)}
-                    </p>
-                  `
-                  : ""
-              }
-
-              <p class="mt-3 text-[10px] font-bold text-slate-400">
-                ${escapeHTML(date)}
-              </p>
-
-            </div>
-
-          </div>
-        </article>
-      `;
-    }
-
-
-    /* =========================================================
-       HOME LEADS
-       ========================================================= */
-
-    function renderHomeLeads() {
-      const container = $("homeLeadFeed");
-
-      if (!container) {
-        return;
-      }
-
-      const leads = allLeads.slice(0, 5);
-
-      if (!leads.length) {
-        container.innerHTML = `
-          <div class="p-8 text-center">
-            <p class="text-sm font-bold text-slate-500">
-              No leads yet.
-            </p>
-
-            <p class="mt-1 text-xs text-slate-400">
-              New leads will appear here automatically.
-            </p>
-          </div>
-        `;
-
-        return;
-      }
-
-      container.innerHTML =
-        leads.map(renderLeadCard).join("");
-    }
-
-
-    /* =========================================================
-       LEAD LIST
-       ========================================================= */
-
-    function renderLeadList() {
-      const container = $("leadList");
-
-      if (!container) {
-        return;
-      }
-
-      let leads = [...allLeads];
-
-      if (currentLeadFilter !== "all") {
-        leads = leads.filter((lead) => {
-          const status = normalizeStatus(
-            lead.status ||
-            lead.lead_status ||
-            lead.stage
-          );
-
-          return status.toLowerCase() ===
-            currentLeadFilter;
-        });
-      }
-
-      if (!leads.length) {
-        container.innerHTML = `
-          <div class="p-10 text-center">
-            <p class="text-sm font-bold text-slate-500">
-              No leads found.
-            </p>
-          </div>
-        `;
-
-        return;
-      }
-
-      container.innerHTML =
-        leads.map(renderLeadCard).join("");
-    }
-
-
-    /* =========================================================
-       FILTER COUNTS
-       ========================================================= */
-
-    function renderFilterCounts() {
-      let pending = 0;
-      let booked = 0;
-
-      allLeads.forEach((lead) => {
-        const status = normalizeStatus(
-          lead.status ||
-          lead.lead_status ||
-          lead.stage
-        );
-
-        if (status === "Pending") {
-          pending++;
-        }
-
-        if (status === "Booked") {
-          booked++;
-        }
-      });
-
-      $("filterAllCount").textContent =
-        allLeads.length;
-
-      $("filterPendingCount").textContent =
-        pending;
-
-      $("filterBookedCount").textContent =
-        booked;
-    }
-
-
-    /* =========================================================
-       FASTAPI LEAD SUBMISSION
-       IMPORTANT:
-       This does NOT require a Supabase session.
-       ========================================================= */
-
-    async function submitLeadToFastAPI(
-      payload,
-      options = {}
-    ) {
-      const endpoint =
-        options.endpoint ||
-        "/leads";
-
-      const url =
-        `${CONFIG.FASTAPI_BASE_URL.replace(/\/$/, "")}${endpoint}`;
-
-      const headers = {
-        "Content-Type": "application/json"
-      };
-
-      if (currentSession?.access_token) {
-        headers.Authorization =
-          `Bearer ${currentSession.access_token}`;
-      }
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload)
-      });
-
-      const contentType =
-        response.headers.get("content-type") || "";
-
-      let data;
-
-      if (contentType.includes("application/json")) {
-        data = await response.json();
-      } else {
-        data = await response.text();
-      }
-
-      if (!response.ok) {
-        const message =
-          typeof data === "object"
-            ? data?.detail ||
-              data?.message ||
-              JSON.stringify(data)
-            : data;
-
-        throw new Error(
-          message ||
-          `FastAPI request failed (${response.status})`
-        );
-      }
-
-      return data;
-    }
-
-
-    /* =========================================================
-       OPTIONAL PUBLIC LEAD FORM SUPPORT
-       ========================================================= */
-
-    async function handleLeadFormSubmit(event) {
-      event.preventDefault();
-
-      const form = event.currentTarget;
-
-      const submitButton =
-        form.querySelector(
-          '[type="submit"]'
-        );
-
-      const formData =
-        new FormData(form);
-
-      const payload = {};
-
-      for (const [key, value] of formData.entries()) {
-        payload[key] = value;
-      }
-
-      const businessId =
-        form.dataset.businessId ||
-        currentBusiness?.id ||
-        null;
-
-      if (businessId && !payload.business_id) {
-        payload.business_id = businessId;
-      }
-
-      try {
-        if (submitButton) {
-          submitButton.disabled = true;
-        }
-
-        await submitLeadToFastAPI(payload, {
-          endpoint:
-            form.dataset.endpoint ||
-            "/leads"
-        });
-
-        form.reset();
-
-        showToast("Lead submitted successfully.");
-
-        await loadLeads();
-      } catch (error) {
-        console.error(
-          "Lead submission failed:",
-          error
-        );
-
-        showToast(
-          error?.message ||
-          "Lead submission failed."
-        );
-      } finally {
-        if (submitButton) {
-          submitButton.disabled = false;
-        }
-      }
-    }
-
-
-    function wireLeadForms() {
-      document
-        .querySelectorAll(
-          "form[data-lead-form]"
-        )
-        .forEach((form) => {
-          form.addEventListener(
-            "submit",
-            handleLeadFormSubmit
-          );
-        });
-    }
-
-
-    /* =========================================================
-       REALTIME
-       ========================================================= */
-
-    function subscribeToLeads() {
-      if (
-        !supabaseClient ||
-        !currentUser
-      ) {
-        return;
-      }
-
-      if (realtimeChannel) {
-        try {
-          supabaseClient.removeChannel(
-            realtimeChannel
-          );
-        } catch (error) {
-          console.error(error);
-        }
-
-        realtimeChannel = null;
-      }
-
-      realtimeChannel =
-        supabaseClient
-          .channel(
-            `recall-leads-${currentUser.id}`
-          )
-          .on(
-            "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: CONFIG.LEADS_TABLE
-            },
-            async (payload) => {
-              const businessIds =
-                getBusinessIds();
-
-              const changed =
-                payload?.new ||
-                payload?.old ||
-                {};
-
-              const belongsToBusiness =
-                !businessIds.length ||
-                businessIds.includes(
-                  changed.business_id
-                ) ||
-                changed.owner_id ===
-                  currentUser.id ||
-                changed.user_id ===
-                  currentUser.id;
-
-              if (belongsToBusiness) {
-                await loadLeads();
-              }
-            }
-          )
-          .subscribe((status) => {
-            console.log(
-              "Realtime status:",
-              status
-            );
-          });
-    }
-
-
-    /* =========================================================
-       VIEW SWITCHING
-       ========================================================= */
-
-    function switchView(view) {
-      const views = [
-        "home",
-        "leads",
-        "profile"
-      ];
-
-      views.forEach((name) => {
-        const element =
-          $(`${name}View`);
-
-        if (element) {
-          element.classList.toggle(
-            "hidden-view",
-            name !== view
-          );
-        }
-      });
-
-      document
-        .querySelectorAll(
-          ".nav-button"
-        )
-        .forEach((button) => {
-          const active =
-            button.dataset.view === view;
-
-          if (active) {
-            button.className =
-              "nav-button nav-active flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-bold";
-          } else {
-            button.className =
-              "nav-button flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-bold text-slate-500 hover:bg-slate-100";
-          }
-        });
-
-
-      document
-        .querySelectorAll(
-          ".mobile-nav-button"
-        )
-        .forEach((button) => {
-          const active =
-            button.dataset.view === view;
-
-          button.className =
-            active
-              ? "mobile-nav-button py-3 text-xs font-black text-slate-950"
-              : "mobile-nav-button py-3 text-xs font-black text-slate-400";
-        });
-
-
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-      });
-    }
-
-
     /* =========================================================
        EVENT WIRING
        ========================================================= */
-
     function wireEvents() {
+      $$("[data-view-btn]").forEach((button) => {
+        button.addEventListener("click", () => switchView(button.dataset.viewBtn));
+      });
 
-      $("signInTab")
-        .addEventListener(
-          "click",
-          () => setAuthMode("signin")
-        );
+      $$("[data-go]").forEach((button) => {
+        button.addEventListener("click", () => switchView(button.dataset.go));
+      });
 
-      $("signUpTab")
-        .addEventListener(
-          "click",
-          () => setAuthMode("signup")
-        );
-
-      $("authForm")
-        .addEventListener(
-          "submit",
-          handleAuthSubmit
-        );
-
-      $("forgotPassword")
-        .addEventListener(
-          "click",
-          handleForgotPassword
-        );
-
-      $("signOutButton")
-        .addEventListener(
-          "click",
-          signOut
-        );
-
-      $("brandButton")
-        .addEventListener(
-          "click",
-          () => switchView("home")
-        );
-
-      $("homeViewLeads")
-        .addEventListener(
-          "click",
-          () => switchView("leads")
-        );
-
-      $("refreshLeads")
-        .addEventListener(
-          "click",
-          async () => {
-            const button =
-              $("refreshLeads");
-
-            button.disabled = true;
-            button.textContent =
-              "Refreshing...";
-
-            try {
-              await loadLeads();
-              showToast("Leads refreshed.");
-            } finally {
-              button.disabled = false;
-              button.textContent =
-                "Refresh";
-            }
-          }
-        );
-
-      $("profileForm")
-        .addEventListener(
-          "submit",
-          saveProfile
-        );
-
-
-      document
-        .querySelectorAll(
-          "[data-view]"
-        )
-        .forEach((button) => {
-          button.addEventListener(
-            "click",
-            () => {
-              switchView(
-                button.dataset.view
-              );
-            }
-          );
+      $$(".filter-button").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.activeLeadFilter = button.dataset.filter;
+          $$(".filter-button").forEach((btn) => {
+            const active = btn.dataset.filter === state.activeLeadFilter;
+            btn.classList.toggle("active", active);
+            btn.classList.toggle("bg-recall-950", active);
+            btn.classList.toggle("text-white", active);
+            btn.classList.toggle("bg-slate-100", !active);
+            btn.classList.toggle("text-slate-600", !active);
+          });
+          renderLeads();
         });
+      });
 
-
-      document
-        .querySelectorAll(
-          ".lead-filter"
-        )
-        .forEach((button) => {
-          button.addEventListener(
-            "click",
-            () => {
-              currentLeadFilter =
-                button.dataset.filter ||
-                "all";
-
-              renderLeadList();
-            }
-          );
-        });
-
-
-      wireLeadForms();
-    }
-
-
-    /* =========================================================
-       SESSION BOOTSTRAP
-       ========================================================= */
-
-    async function bootstrapSession() {
-      if (!supabaseClient) {
-        renderSignedOutState();
-        return;
-      }
-
-      try {
-        const {
-          data,
-          error
-        } =
-          await supabaseClient.auth.getSession();
-
-        if (error) {
-          throw error;
-        }
-
-        currentSession =
-          data?.session || null;
-
-        currentUser =
-          currentSession?.user || null;
-
-        if (currentSession && currentUser) {
-          await showApp();
+      $("#refreshButton").addEventListener("click", async () => {
+        if (state.supabase && state.user) {
+          await bootstrapData();
         } else {
-          renderSignedOutState();
+          showToast("Demo mode is active.");
         }
-      } catch (error) {
-        console.error(
-          "Session bootstrap failed:",
-          error
-        );
+      });
 
-        renderSignedOutState();
-      }
+      $("#saveProfileButton").addEventListener("click", saveProfile);
+      $("#signOutButton").addEventListener("click", signOut);
     }
-
-
-    /* =========================================================
-       AUTH STATE LISTENER
-       ========================================================= */
-
-    function setupAuthListener() {
-      if (!supabaseClient) {
-        return;
-      }
-
-      supabaseClient.auth.onAuthStateChange(
-        (event, session) => {
-
-          /*
-           * Do not perform heavy database work directly
-           * inside the Supabase auth callback.
-           */
-
-          setTimeout(async () => {
-
-            currentSession =
-              session || null;
-
-            currentUser =
-              session?.user || null;
-
-            if (
-              session &&
-              currentUser
-            ) {
-              await showApp();
-            } else {
-              renderSignedOutState();
-            }
-
-          }, 0);
-        }
-      );
-    }
-
 
     /* =========================================================
        BOOT
        ========================================================= */
-
     (async function boot() {
-
       wireEvents();
-
       switchView("home");
 
-      setAuthMode("signin");
+      const configured = initSupabase();
 
-      const configured =
-        initSupabase();
-
-      if (!configured) {
-        renderSignedOutState();
-        return;
+      if (configured) {
+        try {
+          await requireSession();
+          if (!state.user) {
+            renderSignedOutState();
+          } else {
+            await bootstrapData();
+          }
+        } catch (error) {
+          console.error(error);
+          renderErrorState(error);
+        }
       }
-
-      setupAuthListener();
-
-      await bootstrapSession();
-
     })();
-
   </script>
-
 </body>
 </html>
