@@ -579,11 +579,8 @@
       SUPABASE_URL: "https://qyfxijdzayvaietjonzw.supabase.co",
       SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5ZnhpamR6YXl2YWlldGpvbnp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2MjAyOTAsImV4cCI6MjEwNDE5NjI5MH0.txde2HWklchF_0WNQbmJeOI0jqjn-A-x1d9fMu9w2ck",
 
-      // Optional FastAPI base URL for future authenticated actions.
-      // Example: "https://api.example.com"
       FASTAPI_BASE_URL: "https://auto-recover-ai.onrender.com",
 
-      // Tables used by the UI.
       BUSINESS_TABLE: "businesses",
       LEADS_TABLE: "leads"
     };
@@ -598,7 +595,9 @@
       leads: [],
       activeView: "home",
       activeLeadFilter: "all",
-      channel: null
+      channel: null,
+      isBootstrapping: false,
+      ensuringBusinessPromise: null
     };
 
     const authState = {
@@ -708,7 +707,6 @@
     function sanitizePhone(raw) {
       if (!raw) return "";
       const input = String(raw).trim();
-      // Keep + and digits. This supports E.164 while being forgiving of spaces/dashes.
       const cleaned = input.replace(/[^\d+]/g, "");
       if (cleaned.startsWith("+")) return "+" + cleaned.slice(1).replace(/\+/g, "");
       return cleaned.replace(/\+/g, "");
@@ -745,7 +743,6 @@
     function isCallCaught(lead) {
       const explicit = getFirst(lead, ["call_caught", "caught", "is_recovered", "recovered", "missed_call_recovered"]);
       if (explicit !== null) return Boolean(explicit);
-      // In the absence of a call flag, an existing lead row is treated as a caught opportunity.
       return true;
     }
 
@@ -768,34 +765,40 @@
     }
 
     function setLoading(isLoading) {
-      $("#refreshIcon").classList.toggle("animate-spin", isLoading);
-      $("#refreshButton").disabled = isLoading;
-      $("#refreshButton").classList.toggle("opacity-60", isLoading);
+      const icon = $("#refreshIcon");
+      const btn = $("#refreshButton");
+      if (icon) icon.classList.toggle("animate-spin", isLoading);
+      if (btn) {
+        btn.disabled = isLoading;
+        btn.classList.toggle("opacity-60", isLoading);
+      }
     }
 
     function showAuthScreen() {
-      $("#authScreen").classList.remove("hidden-view");
-      $("#authScreen").classList.remove("hidden");
+      $("#authScreen")?.classList.remove("hidden-view");
+      $("#authScreen")?.classList.remove("hidden");
     }
 
     function hideAuthScreen() {
-      $("#authScreen").classList.add("hidden-view");
-      $("#authScreen").classList.add("hidden");
+      $("#authScreen")?.classList.add("hidden-view");
+      $("#authScreen")?.classList.add("hidden");
     }
 
     function setAuthMode(mode) {
       authState.mode = mode;
       const isSignIn = mode === "signin";
-      $("#authSignInTab").classList.toggle("active", isSignIn);
-      $("#authSignInTab").classList.toggle("text-slate-500", !isSignIn);
-      $("#authSignUpTab").classList.toggle("active", !isSignIn);
-      $("#authSignUpTab").classList.toggle("text-slate-500", isSignIn);
+      $("#authSignInTab")?.classList.toggle("active", isSignIn);
+      $("#authSignInTab")?.classList.toggle("text-slate-500", !isSignIn);
+      $("#authSignUpTab")?.classList.toggle("active", !isSignIn);
+      $("#authSignUpTab")?.classList.toggle("text-slate-500", isSignIn);
 
-      $("#signInForm").classList.toggle("hidden", !isSignIn);
-      $("#signUpForm").classList.toggle("hidden", isSignIn);
+      $("#signInForm")?.classList.toggle("hidden", !isSignIn);
+      $("#signUpForm")?.classList.toggle("hidden", isSignIn);
 
-      $("#authHeading").textContent = isSignIn ? "Welcome back." : "Get started.";
-      $("#authSubheading").textContent = isSignIn
+      const heading = $("#authHeading");
+      const subheading = $("#authSubheading");
+      if (heading) heading.textContent = isSignIn ? "Welcome back." : "Get started.";
+      if (subheading) subheading.textContent = isSignIn
         ? "Sign in to monitor recovered leads, bookings and revenue in real time."
         : "Create your Recall account to start recovering missed calls automatically.";
     }
@@ -810,11 +813,12 @@
     }
 
     function clearAuthMessages() {
-      $("#signInMessage").classList.add("hidden");
-      $("#signUpMessage").classList.add("hidden");
+      $("#signInMessage")?.classList.add("hidden");
+      $("#signUpMessage")?.classList.add("hidden");
     }
 
     function setAuthButtonLoading(button, isLoading, loadingText, defaultText) {
+      if (!button) return;
       button.disabled = isLoading;
       button.textContent = isLoading ? loadingText : defaultText;
       button.classList.toggle("opacity-70", isLoading);
@@ -840,8 +844,7 @@
         if (error) throw error;
         state.user = data?.user || null;
         if (!state.user) throw new Error("Authentication succeeded but no user session was returned.");
-        hideAuthScreen();
-        await bootstrapData();
+        // Note: state changes handled via onAuthStateChange automatically
       } catch (error) {
         console.error("Sign in failed:", error);
         showAuthMessage(error.message || "Unable to sign in.", "error", "#signInMessage");
@@ -879,8 +882,6 @@
         if (data?.session && data?.user) {
           state.user = data.user;
           await ensureBusinessProfile({ businessName, ownerName: fullName });
-          hideAuthScreen();
-          await bootstrapData();
         } else {
           showAuthMessage("Account created. Check your email to confirm your account, then sign in.", "success", "#signUpMessage");
           setTimeout(() => { setAuthMode("signin"); $("#signInEmail").value = email; }, 1400);
@@ -912,23 +913,58 @@
 
     async function ensureBusinessProfile({ businessName = "", ownerName = "" } = {}) {
       if (!state.supabase || !state.user) return null;
-      const existing = await fetchBusiness();
-      if (existing) { state.business = existing; return existing; }
-      const payload = {
-        owner_id: state.user.id,
-        business_name: businessName || getFirst(state.user.user_metadata || {}, ["business_name"], "My Business"),
-        owner_name: ownerName || getFirst(state.user.user_metadata || {}, ["full_name", "name"], ""),
-        is_active: true
-      };
-      const { data, error } = await state.supabase.from(CONFIG.BUSINESS_TABLE).insert(payload).select("*").single();
-      if (error) {
-        const retry = await fetchBusiness();
-        if (retry) { state.business = retry; return retry; }
-        console.warn("Business profile could not be created:", error);
-        return null;
+      if (state.business) return state.business;
+
+      // Prevent race conditions from concurrent duplicate bootstrap calls
+      if (state.ensuringBusinessPromise) {
+        return await state.ensuringBusinessPromise;
       }
-      state.business = data || null;
-      return state.business;
+
+      state.ensuringBusinessPromise = (async () => {
+        try {
+          const existing = await fetchBusiness();
+          if (existing) {
+            state.business = existing;
+            return existing;
+          }
+
+          const bName = businessName || getFirst(state.user.user_metadata || {}, ["business_name"], "My Business");
+          const oName = ownerName || getFirst(state.user.user_metadata || {}, ["full_name", "name"], "");
+
+          let payload = {
+            owner_id: state.user.id,
+            business_name: bName,
+            owner_name: oName,
+            is_active: true
+          };
+
+          let { data, error } = await state.supabase.from(CONFIG.BUSINESS_TABLE).insert(payload).select("*").single();
+
+          if (error && /owner_id/i.test(error.message || "")) {
+            payload = {
+              user_id: state.user.id,
+              business_name: bName,
+              owner_name: oName,
+              is_active: true
+            };
+            ({ data, error } = await state.supabase.from(CONFIG.BUSINESS_TABLE).insert(payload).select("*").single());
+          }
+
+          if (error) {
+            const retry = await fetchBusiness();
+            if (retry) { state.business = retry; return retry; }
+            console.warn("Business profile could not be created:", error);
+            return null;
+          }
+
+          state.business = data || null;
+          return state.business;
+        } finally {
+          state.ensuringBusinessPromise = null;
+        }
+      })();
+
+      return await state.ensuringBusinessPromise;
     }
 
     /* =========================================================
@@ -985,7 +1021,6 @@
       return state.user;
     }
 
-
     function handleSignedOut() {
       state.user = null;
       state.business = null;
@@ -998,7 +1033,6 @@
       setAuthMode("signin");
     }
 
-    // Compatibility wrapper used by the rest of the application.
     function renderSignedOutState() {
       handleSignedOut();
     }
@@ -1013,8 +1047,6 @@
 
     /* =========================================================
        DATA ACCESS LAYER
-       Keep all Supabase query logic here so schema changes
-       can be handled in one predictable place.
        ========================================================= */
     async function fetchBusiness() {
       const user = state.user;
@@ -1022,7 +1054,6 @@
 
       const table = CONFIG.BUSINESS_TABLE;
 
-      // Standard pattern: businesses.owner_id references auth.users.id.
       let query = state.supabase
         .from(table)
         .select("*")
@@ -1032,7 +1063,6 @@
 
       let { data, error } = await query;
 
-      // Graceful fallback for teams using user_id instead of owner_id.
       if (error && /owner_id/i.test(error.message || "")) {
         ({ data, error } = await state.supabase
           .from(table)
@@ -1044,7 +1074,6 @@
 
       if (error) throw error;
 
-      // Some schemas link business rows by auth email.
       if (!data) {
         const email = user.email;
         if (email) {
@@ -1064,9 +1093,7 @@
     async function fetchLeads(business) {
       const table = CONFIG.LEADS_TABLE;
       const select = "*";
-      const monthISO = monthStartISO();
 
-      // Prefer business_id. If the schema is user-scoped instead, fall back to user_id.
       let query;
       if (business?.id) {
         query = state.supabase
@@ -1087,7 +1114,6 @@
       let { data, error } = await query;
 
       if (error && /updated_at/i.test(error.message || "")) {
-        // Common schema fallback: created_at is used for the feed timestamp.
         if (business?.id) {
           ({ data, error } = await state.supabase
             .from(table)
@@ -1105,22 +1131,17 @@
         }
       }
 
-      if (error) {
-        // Last-resort: fetch by user_id when business_id is not part of the schema.
-        if (business?.id && /business_id/i.test(error.message || "")) {
-          ({ data, error } = await state.supabase
-            .from(table)
-            .select(select)
-            .eq("user_id", state.user.id)
-            .order("created_at", { ascending: false })
-            .limit(250));
-        }
+      if (error && (/business_id/i.test(error.message || "") || /owner_id/i.test(error.message || ""))) {
+        ({ data, error } = await state.supabase
+          .from(table)
+          .select(select)
+          .eq("user_id", state.user.id)
+          .order("created_at", { ascending: false })
+          .limit(250));
       }
 
       if (error) throw error;
 
-      // Month-level filtering stays client-side to remain schema-flexible.
-      // We still keep the full recent feed in state for the Leads tab.
       return Array.isArray(data) ? data : [];
     }
 
@@ -1129,6 +1150,9 @@
         renderSignedOutState();
         return;
       }
+
+      if (state.isBootstrapping) return;
+      state.isBootstrapping = true;
 
       setLoading(true);
       try {
@@ -1155,6 +1179,7 @@
         showToast(error.message || "Unable to load your Recall data.", "error");
         renderErrorState(error);
       } finally {
+        state.isBootstrapping = false;
         setLoading(false);
       }
     }
@@ -1181,7 +1206,6 @@
             filter: `business_id=eq.${state.business.id}`
           },
           async () => {
-            // Re-query instead of manually patching rows so all derived metrics stay correct.
             try {
               state.leads = await fetchLeads(state.business);
               renderAll();
@@ -1226,48 +1250,49 @@
 
       const greeting = businessName || ownerName || "Welcome back";
 
-      $("#greetingLine").textContent = greetingByHour();
-      $("#businessGreeting").textContent = businessName || greeting;
-      $("#ownerSubline").textContent = ownerName
+      if ($("#greetingLine")) $("#greetingLine").textContent = greetingByHour();
+      if ($("#businessGreeting")) $("#businessGreeting").textContent = businessName || greeting;
+      if ($("#ownerSubline")) $("#ownerSubline").textContent = ownerName
         ? `${ownerName}, your AI recovery system is monitoring missed calls.`
         : "Your AI recovery system is monitoring missed calls.";
 
-      $("#profileBusinessName").textContent = businessName || "Your business";
-      $("#profileOwnerName").textContent = ownerName || "Owner";
-      $("#profileAvatar").textContent = initials(businessName || ownerName || "Recall");
-      $("#accountEmail").textContent = safeText(state.user?.email);
+      if ($("#profileBusinessName")) $("#profileBusinessName").textContent = businessName || "Your business";
+      if ($("#profileOwnerName")) $("#profileOwnerName").textContent = ownerName || "Owner";
+      if ($("#profileAvatar")) $("#profileAvatar").textContent = initials(businessName || ownerName || "Recall");
+      if ($("#accountEmail")) $("#accountEmail").textContent = safeText(state.user?.email);
 
-      $("#businessNameInput").value = businessName || "";
-      $("#ownerNameInput").value = ownerName || "";
-      $("#routingNumberInput").value = getFirst(
+      if ($("#businessNameInput")) $("#businessNameInput").value = businessName || "";
+      if ($("#ownerNameInput")) $("#ownerNameInput").value = ownerName || "";
+      if ($("#routingNumberInput")) $("#routingNumberInput").value = getFirst(
         state.business,
         ["routing_number", "assigned_routing_number", "phone_number", "inbound_number"],
         ""
       ) || "";
 
       const active = Boolean(getFirst(state.business, ["is_active", "active", "subscription_active"], false));
-      $("#subscriptionStatus").textContent = active ? "Your subscription is active" : "Subscription is inactive";
-      $("#subscriptionBadge").textContent = active ? "ACTIVE" : "INACTIVE";
-      $("#subscriptionBadge").className =
-        "px-2.5 py-1.5 rounded-full text-[10px] font-extrabold border " +
-        (active
-          ? "bg-emerald-400/15 text-emerald-200 border-emerald-300/20"
-          : "bg-rose-400/15 text-rose-200 border-rose-300/20");
+      if ($("#subscriptionStatus")) $("#subscriptionStatus").textContent = active ? "Your subscription is active" : "Subscription is inactive";
+      if ($("#subscriptionBadge")) {
+        $("#subscriptionBadge").textContent = active ? "ACTIVE" : "INACTIVE";
+        $("#subscriptionBadge").className =
+          "px-2.5 py-1.5 rounded-full text-[10px] font-extrabold border " +
+          (active
+            ? "bg-emerald-400/15 text-emerald-200 border-emerald-300/20"
+            : "bg-rose-400/15 text-rose-200 border-rose-300/20");
+      }
     }
 
     function renderMetrics() {
       const metrics = calculateMetrics();
-      // Adjust currency here if your business billing currency is not NGN.
       const currency = getFirst(state.business, ["currency", "billing_currency"], "NGN") || "NGN";
 
-      $("#metricRevenue").textContent = formatCurrency(metrics.revenue, currency);
-      $("#metricCalls").textContent = metrics.caught.toLocaleString();
-      $("#metricBooked").textContent = metrics.booked.toLocaleString();
-      $("#metricConversion").textContent = `${metrics.conversion}%`;
+      if ($("#metricRevenue")) $("#metricRevenue").textContent = formatCurrency(metrics.revenue, currency);
+      if ($("#metricCalls")) $("#metricCalls").textContent = metrics.caught.toLocaleString();
+      if ($("#metricBooked")) $("#metricBooked").textContent = metrics.booked.toLocaleString();
+      if ($("#metricConversion")) $("#metricConversion").textContent = `${metrics.conversion}%`;
 
-      $("#heroRevenue").textContent = formatCurrency(metrics.revenue, currency);
-      $("#heroLeads").textContent = state.leads.length.toLocaleString();
-      $("#leadCount").textContent = state.leads.length.toLocaleString();
+      if ($("#heroRevenue")) $("#heroRevenue").textContent = formatCurrency(metrics.revenue, currency);
+      if ($("#heroLeads")) $("#heroLeads").textContent = state.leads.length.toLocaleString();
+      if ($("#leadCount")) $("#leadCount").textContent = state.leads.length.toLocaleString();
     }
 
     function leadCardMarkup(lead, compact = false) {
@@ -1310,6 +1335,7 @@
 
     function renderHomeLeadFeed() {
       const container = $("#homeLeadFeed");
+      if (!container) return;
       const leads = state.leads.slice(0, 5);
 
       if (!leads.length) {
@@ -1330,6 +1356,7 @@
       const filter = state.activeLeadFilter;
       const filtered = state.leads.filter((lead) => filter === "all" || normalizeStatus(getFirst(lead, ["status", "lead_status", "outcome", "stage"], "Inquiry")) === filter);
       const container = $("#leadsList");
+      if (!container) return;
 
       if (!filtered.length) {
         container.innerHTML = `
@@ -1356,25 +1383,25 @@
 
     function renderErrorState(error) {
       const message = safeText(error?.message, "Data could not be loaded.");
-      $("#homeLeadFeed").innerHTML = `
+      const feed = $("#homeLeadFeed");
+      if (!feed) return;
+      feed.innerHTML = `
         <div class="p-6">
           <p class="text-sm font-extrabold text-rose-600">Could not load live data</p>
           <p class="mt-1 text-xs text-slate-500 leading-relaxed">${escapeHtml(message)}</p>
           <button id="retryButton" class="mt-4 rounded-xl bg-slate-950 text-white px-3.5 py-2.5 text-xs font-bold">Retry</button>
         </div>
       `;
-      $("#retryButton")?.addEventListener("click", bootstrapData);
+      const retryBtn = $("#retryButton");
+      if (retryBtn) retryBtn.onclick = bootstrapData;
     }
 
     function renderDemoState() {
-      // Demo data intentionally disabled in production.
       renderSignedOutState();
     }
 
     /* =========================================================
        PROFILE SAVE
-       Updates the current business row without hard-coding a
-       database schema beyond common column names.
        ========================================================= */
     async function saveProfile() {
       if (!state.supabase || !state.business?.id) {
@@ -1392,17 +1419,31 @@
       }
 
       const patch = {};
-
-      // Only send fields known to exist in this common schema.
-      // For a different naming convention, change these lines in one block.
       if (businessName) patch.business_name = businessName;
       if (ownerName) patch.owner_name = ownerName;
       if (routingNumber) patch.routing_number = routingNumber;
 
-      const { error } = await state.supabase
+      if (Object.keys(patch).length === 0) {
+        showToast("No changes to save.", "dark");
+        return;
+      }
+
+      let { error } = await state.supabase
         .from(CONFIG.BUSINESS_TABLE)
         .update(patch)
         .eq("id", state.business.id);
+
+      if (error && /routing_number/i.test(error.message || "")) {
+        delete patch.routing_number;
+        if (Object.keys(patch).length > 0) {
+          ({ error } = await state.supabase
+            .from(CONFIG.BUSINESS_TABLE)
+            .update(patch)
+            .eq("id", state.business.id));
+        } else {
+          error = null;
+        }
+      }
 
       if (error) {
         showToast(error.message, "error");
@@ -1416,9 +1457,6 @@
 
     /* =========================================================
        OPTIONAL FASTAPI HELPER
-       The browser automatically forwards the Supabase JWT for
-       protected FastAPI endpoints. Keep FastAPI actions behind
-       your normal Bearer-token verification middleware.
        ========================================================= */
     async function fetchFromFastAPI(path, options = {}) {
       if (!CONFIG.FASTAPI_BASE_URL) throw new Error("FASTAPI_BASE_URL is not configured.");
@@ -1452,8 +1490,8 @@
       $$(".nav-pill").forEach((button) => button.classList.toggle("active", button.dataset.viewBtn === view));
 
       const titles = { home: "Dashboard", leads: "Lead activity", profile: "Profile" };
-      $("#pageTitle").textContent = titles[view] || "Recall";
-      $("#mainView").scrollTop = 0;
+      if ($("#pageTitle")) $("#pageTitle").textContent = titles[view] || "Recall";
+      if ($("#mainView")) $("#mainView").scrollTop = 0;
     }
 
     /* =========================================================
@@ -1495,7 +1533,7 @@
         });
       });
 
-      $("#refreshButton").addEventListener("click", async () => {
+      $("#refreshButton")?.addEventListener("click", async () => {
         if (state.supabase && state.user) {
           await bootstrapData();
         } else {
@@ -1503,15 +1541,14 @@
         }
       });
 
-      $("#saveProfileButton").addEventListener("click", saveProfile);
-      $("#signOutButton").addEventListener("click", signOut);
+      $("#saveProfileButton")?.addEventListener("click", saveProfile);
+      $("#signOutButton")?.addEventListener("click", signOut);
 
-      // Authentication controls.
-      $("#authSignInTab").addEventListener("click", () => setAuthMode("signin"));
-      $("#authSignUpTab").addEventListener("click", () => setAuthMode("signup"));
-      $("#signInForm").addEventListener("submit", handleSignIn);
-      $("#signUpForm").addEventListener("submit", handleSignUp);
-      $("#forgotPasswordButton").addEventListener("click", handleForgotPassword);
+      $("#authSignInTab")?.addEventListener("click", () => setAuthMode("signin"));
+      $("#authSignUpTab")?.addEventListener("click", () => setAuthMode("signup"));
+      $("#signInForm")?.addEventListener("submit", handleSignIn);
+      $("#signUpForm")?.addEventListener("submit", handleSignUp);
+      $("#forgotPasswordButton")?.addEventListener("click", handleForgotPassword);
     }
 
     /* =========================================================
@@ -1525,22 +1562,6 @@
       const configured = initSupabase();
 
       if (!configured) {
-        renderSignedOutState();
-        return;
-      }
-
-      try {
-        await requireSession();
-
-        if (!state.user) {
-          renderSignedOutState();
-        } else {
-          hideAuthScreen();
-          await bootstrapData();
-        }
-      } catch (error) {
-        console.error("Recall boot error:", error);
-        state.user = null;
         renderSignedOutState();
       }
     })();
